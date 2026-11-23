@@ -277,27 +277,57 @@ final class Filesystem
         ];
     }
 
-    public function readText(string $relative): array
+    /**
+     * Verified read handle: refuse symlink/hardlink substitution between
+     * path validation and fopen. This is still not a full dirfd/openat2
+     * defense against hostile same-UID writers; OS account isolation remains
+     * mandatory.
+     * @return array{resource,string,int}
+     */
+    public function openFileForRead(string $relative): array
     {
         $source = $this->resolve($relative);
         if (!is_file($source) || !is_readable($source)) {
             throw new FileError('File cannot be read.', 403);
         }
-        $size = @filesize($source);
-        if ($size === false || $size > $this->maxEditBytes) {
-            throw new FileError('File exceeds the editor size limit.', 413);
-        }
-        $content = @file_get_contents($source);
-        if ($content === false || strlen($content) > $this->maxEditBytes ||
-            str_contains($content, "\0") || !preg_match('//u', $content)) {
-            throw new FileError('Editor supports bounded UTF-8 text files only.', 415);
-        }
+        $handle = @fopen($source, 'rb');
+        if (!is_resource($handle)) throw new FileError('Could not open file.', 403);
+        $open = fstat($handle);
         clearstatcache(true, $source);
-        return [
-            'path' => $this->relative($relative), 'content' => $content,
-            'hash' => hash('sha256', $content), 'maxBytes' => $this->maxEditBytes,
-            'modified' => @filemtime($source) ?: null,
-        ];
+        $link = @lstat($source);
+        if (!is_array($open) || !is_array($link) || is_link($source) ||
+            ($open['mode'] & 0170000) !== 0100000 || ($open['nlink'] ?? 1) !== 1 ||
+            $link['dev'] !== $open['dev'] || $link['ino'] !== $open['ino']) {
+            fclose($handle);
+            throw new FileError('File changed or is not an authorized regular file.', 403);
+        }
+        return [$handle, basename($source), (int) $open['size']];
+    }
+
+    public function readText(string $relative): array
+    {
+        [$handle, , $size] = $this->openFileForRead($relative);
+        try {
+            if ($size > $this->maxEditBytes) {
+                throw new FileError('File exceeds the editor size limit.', 413);
+            }
+            $before = fstat($handle);
+            $content = stream_get_contents($handle, $this->maxEditBytes + 1);
+            $after = fstat($handle);
+            if ($content === false || strlen($content) > $this->maxEditBytes ||
+                strlen($content) !== $size || !is_array($before) || !is_array($after) ||
+                $before['mtime'] !== $after['mtime'] || $before['ctime'] !== $after['ctime'] ||
+                str_contains($content, "\0") || !preg_match('//u', $content)) {
+                throw new FileError('Editor supports unchanged, bounded UTF-8 files only.', 415);
+            }
+            return [
+                'path' => $this->relative($relative), 'content' => $content,
+                'hash' => hash('sha256', $content), 'maxBytes' => $this->maxEditBytes,
+                'modified' => $after['mtime'],
+            ];
+        } finally {
+            fclose($handle);
+        }
     }
 
     /** Optimistic concurrency + advisory lock; does not replace OS isolation. */
@@ -325,6 +355,12 @@ final class Filesystem
             if (!is_array($beforeStat) || ($beforeStat['mode'] & 0170000) !== 0100000 || ($beforeStat['nlink'] ?? 1) !== 1 ||
                 $beforeStat['size'] > $this->maxEditBytes) {
                 throw new FileError('File is not a safe, bounded regular file.', 403);
+            }
+            clearstatcache(true, $source);
+            $pathStat = @lstat($source);
+            if (!is_array($pathStat) || is_link($source) || $beforeStat['dev'] !== $pathStat['dev'] ||
+                $beforeStat['ino'] !== $pathStat['ino']) {
+                throw new FileError('File changed during opening.', 409);
             }
             $before = stream_get_contents($in, $this->maxEditBytes + 1);
             if ($before === false || strlen($before) > $this->maxEditBytes ||
@@ -550,19 +586,25 @@ final class Filesystem
      */
     public function checksum(string $relative): array
     {
-        $path = $this->resolve($relative);
-        if (!is_file($path) || !is_readable($path)) {
-            throw new FileError('Checksums require a readable regular file.', 403);
+        [$handle, , $size] = $this->openFileForRead($relative);
+        try {
+            if ($size > 100 * 1024 * 1024) {
+                throw new FileError('Checksums currently support files up to 100 MiB.', 413);
+            }
+            $before = fstat($handle);
+            $hash = hash_init('sha256');
+            $read = hash_update_stream($hash, $handle, $size + 1);
+            $after = fstat($handle);
+            if ($read !== $size || !is_array($before) || !is_array($after) ||
+                $before['mtime'] !== $after['mtime'] || $before['ctime'] !== $after['ctime'] ||
+                $before['size'] !== $after['size']) {
+                throw new FileError('File changed during checksum calculation.', 409);
+            }
+            return ['path' => $this->relative($relative), 'algorithm' => 'SHA-256',
+                    'checksum' => hash_final($hash), 'size' => $size];
+        } finally {
+            fclose($handle);
         }
-        $size = filesize($path);
-        if ($size === false || $size > 100 * 1024 * 1024) {
-            throw new FileError('Checksums currently support files up to 100 MB.', 413);
-        }
-        $value = hash_file('sha256', $path);
-        if ($value === false) throw new FileError('Could not compute the checksum.', 500);
-        clearstatcache(true, $path);
-        if (filesize($path) !== $size) throw new FileError('File changed during checksum calculation.', 409);
-        return ['path' => $this->relative($relative), 'algorithm' => 'SHA-256', 'checksum' => $value, 'size' => $size];
     }
 
     public function upload(string $directory, array $file): array
