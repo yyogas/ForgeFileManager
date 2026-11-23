@@ -150,8 +150,19 @@ final class Http
                     header('Content-Type: application/octet-stream');
                     header('Content-Disposition: attachment; filename="' . addcslashes($name, '"\\') . '"; filename*=UTF-8\'\'' . rawurlencode($name));
                     header('Content-Length: ' . (string) $size);
-                    fpassthru($handle);
-                    fclose($handle);
+                    // Stream exactly the verified file size, even if a local
+                    // process changes the file while the download is running.
+                    $remaining = $size;
+                    try {
+                        while ($remaining > 0 && !feof($handle)) {
+                            $chunk = fread($handle, min(65536, $remaining));
+                            if ($chunk === false || $chunk === '') break;
+                            echo $chunk;
+                            $remaining -= strlen($chunk);
+                        }
+                    } finally {
+                        fclose($handle);
+                    }
                     exit;
                 }
                 if ($action === 'preview') {
