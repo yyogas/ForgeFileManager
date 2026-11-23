@@ -13,8 +13,8 @@ header('Content-Security-Policy: default-src \'self\'; script-src \'self\'; styl
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#ffffff">
   <title>Forge File Manager</title>
-  <link rel="stylesheet" href="/assets/app.css">
-  <script src="/assets/app.js" defer></script>
+  <link rel="stylesheet" href="assets/app.css?v=0.2.1">
+  <script src="assets/app.js?v=0.2.1" defer></script>
 </head>
 <body>
 <svg class="svg-icons" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -56,6 +56,12 @@ header('Content-Security-Policy: default-src \'self\'; script-src \'self\'; styl
   <symbol id="i-save" viewBox="0 0 24 24"><path d="M4 3h14l3 3v15H3V3zM7 3v7h10V3M7 21v-8h10v8"/></symbol>
   <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3 2 21h20zM12 9v5m0 3v1"/></symbol>
 </svg>
+<div id="boot-status" class="boot-status" role="status">
+  <strong>Forge File Manager</strong>
+  <p>Chargement de l’interface…</p>
+  <small>Si ce message reste affiché, vérifiez le chargement des fichiers CSS et JavaScript depuis ce répertoire.</small>
+</div>
+<noscript>JavaScript est nécessaire pour accéder à Forge File Manager. Activez-le dans votre navigateur.</noscript>
 <div id="login-view" class="login-view hidden">
   <div class="login-box">
     <div class="brand brand-login"><span class="brand-icon"><svg class="icon"><use href="#i-folder-open"/></svg></span><span>Forge <strong>File Manager</strong></span></div>
@@ -72,7 +78,7 @@ header('Content-Security-Policy: default-src \'self\'; script-src \'self\'; styl
 </div>
 <div id="app" class="app hidden">
   <header class="topbar">
-    <div class="brand"><button class="icon-button mobile-menu" id="mobile-sidebar" aria-label="Ouvrir l'explorateur"><svg class="icon"><use href="#i-list"/></svg></button><span class="brand-icon"><svg class="icon"><use href="#i-folder-open"/></svg></span><span class="brand-name">Forge <strong>File Manager</strong></span><span class="version-tag">0.2 ALPHA</span></div>
+    <div class="brand"><button class="icon-button mobile-menu" id="mobile-sidebar" aria-label="Ouvrir l'explorateur"><svg class="icon"><use href="#i-list"/></svg></button><span class="brand-icon"><svg class="icon"><use href="#i-folder-open"/></svg></span><span class="brand-name">Forge <strong>File Manager</strong></span><span class="version-tag">0.2.1 ALPHA</span></div>
     <div class="topbar-right">
       <span class="topbar-label">Gestionnaire de fichiers</span>
       <button class="icon-button" id="notifications-btn" aria-label="Notifications" title="Notifications"><svg class="icon"><use href="#i-bell"/></svg><span id="notification-dot" class="notification-dot hidden"></span></button>

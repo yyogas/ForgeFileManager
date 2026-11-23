@@ -3,6 +3,14 @@
 (() => {
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+  // Every endpoint is relative to the HTML document, not the domain root.
+  // Supports /, /index.php and /ForgeFileManager/public/ installations.
+  const apiBaseUrl = new URL('api.php', document.baseURI);
+  const apiUrl = (action, params = {}) => {
+    const url = new URL(apiBaseUrl.href);
+    url.search = new URLSearchParams({action, ...params}).toString();
+    return url.href;
+  };
   const icon = (name) => `<svg class="icon" aria-hidden="true"><use href="#i-${name}"></use></svg>`;
   const escapeHtml = (input) => String(input ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const storage = {
@@ -54,7 +62,7 @@
   }
 
   async function api(action, data, method = 'POST') {
-    const endpoint = `/api.php?action=${encodeURIComponent(action)}`;
+    const endpoint = apiUrl(action);
     const options = {credentials: 'same-origin', cache: 'no-store', method};
     if (method === 'POST') {
       options.headers = {'Content-Type': 'application/json', 'X-CSRF-Token': state.csrf};
@@ -71,8 +79,7 @@
   }
 
   async function get(action, params = {}) {
-    const query = new URLSearchParams({action, ...params});
-    const response = await fetch(`/api.php?${query}`, {credentials: 'same-origin', cache: 'no-store'});
+    const response = await fetch(apiUrl(action, params), {credentials: 'same-origin', cache: 'no-store'});
     let payload;
     try { payload = await response.json(); } catch { throw Error('Réponse serveur invalide.'); }
     if (!response.ok || !payload.ok) {
@@ -109,6 +116,8 @@
     } catch (error) {
       showLogin();
       if (!/Authentication required|Session expired/.test(error.message)) $('#login-error').textContent = error.message;
+    } finally {
+      $('#boot-status')?.remove();
     }
   }
 
@@ -477,7 +486,7 @@
       if (action==='open') {
         if(file.type==='directory'){await navigate(file.path);return;}
         if(file.type==='file'&&['png','jpg','jpeg','gif','webp'].includes(file.extension)){
-          openModal('Aperçu du fichier',`<p class="modal-subtitle">${escapeHtml(file.name)}</p><img style="max-width:100%;max-height:65vh;object-fit:contain" alt="Aperçu ${escapeHtml(file.name)}" src="/api.php?action=preview&amp;path=${encodeURIComponent(file.path)}">`,[{text:'Fermer',run:closeModal}],{wide:true});return;
+          openModal('Aperçu du fichier',`<p class="modal-subtitle">${escapeHtml(file.name)}</p><img style="max-width:100%;max-height:65vh;object-fit:contain" alt="Aperçu ${escapeHtml(file.name)}" src="${escapeHtml(apiUrl('preview', {path:file.path}))}">`,[{text:'Fermer',run:closeModal}],{wide:true});return;
         }
         await editFile(file);return;
       }
@@ -486,7 +495,7 @@
       if (action==='chmod'){chmodDialog(file);return;}
       if (action==='download') {
         if(file.type!=='file')throw Error('Le téléchargement de dossiers sera ajouté avec les archives multi-fichiers.');
-        window.location.assign(`/api.php?action=download&path=${encodeURIComponent(file.path)}`);return;
+        window.location.assign(apiUrl('download', {path:file.path}));return;
       }
       if (action==='rename'){
         promptValue('Renommer','Nouveau nom',file.name,async name=>{
@@ -597,7 +606,7 @@
       }
       const form = new FormData();form.append('path',state.path);form.append('file',file);
       try {
-        const response=await fetch('/api.php?action=upload',{method:'POST',headers:{'X-CSRF-Token':state.csrf},body:form,credentials:'same-origin'});
+        const response=await fetch(apiUrl('upload'),{method:'POST',headers:{'X-CSRF-Token':state.csrf},body:form,credentials:'same-origin'});
         const payload=await response.json();
         if(!response.ok||!payload.ok)throw Error(payload.error||'Import impossible');
         toast(`${t('uploaded')} : ${file.name}`);
@@ -615,7 +624,7 @@
       }
       const form=new FormData();form.append('path',state.path);form.append('file',file);
       try{
-        const response=await fetch('/api.php?action=upload',{method:'POST',headers:{'X-CSRF-Token':state.csrf},body:form,credentials:'same-origin'});
+        const response=await fetch(apiUrl('upload'),{method:'POST',headers:{'X-CSRF-Token':state.csrf},body:form,credentials:'same-origin'});
         const result=await response.json();if(!response.ok||!result.ok)throw Error(result.error);
         toast(`${t('uploaded')} : ${file.name}`);
       }catch(error){toast(`${file.name} : ${error.message}`,true);}

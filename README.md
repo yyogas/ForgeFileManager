@@ -2,7 +2,7 @@
 
 **A modern, account-scoped PHP file manager for web hosting environments.**
 
-> **Status:** `v0.2.0-alpha` — an original, testable **UI + secure-core foundation**. Not production-ready. Not yet a replacement for cPanel File Manager. This repository has **not** imported the external `filemanager-master` distribution because `https://download.wcp360.com/?dir=filemanager-master` could not be retrieved during this development pass. An audited upstream import/migration remains pending; no upstream source code or provenance is falsely claimed.
+> **Status:** `v0.2.1-alpha` — an original, testable **UI + secure-core foundation**. Not production-ready. Not yet a replacement for cPanel File Manager. This repository has **not** imported the external `filemanager-master` distribution because `https://download.wcp360.com/?dir=filemanager-master` could not be retrieved during this development pass. An audited upstream import/migration remains pending; no upstream source code or provenance is falsely claimed.
 
 Forge File Manager is designed to provide a clean, responsive file-management experience for hosting users while enforcing access through a configured hosting-account filesystem root. The current implementation uses native PHP 8.2+, framework-free JavaScript and CSS with no runtime CDN dependency.
 
@@ -178,3 +178,16 @@ The current baseline is intentionally a **small, independently testable foundati
 ## Licensing
 
 A final distribution license is **not yet selected**. Do not assume third-party imported code can be relicensed. Any upstream source later imported from TinyFileManager or another project must be audited for licensing and attribution before inclusion.
+
+### Subdirectory deployment troubleshooting
+
+For a staging URL like `https://example.com/ForgeFileManager/public/`, CSS,
+JavaScript, API, uploads and downloads must be resolved relative to that
+URL prefix. Version 0.2.1-alpha fixes these routes and scopes the PHP
+session cookie to the application URL prefix.
+Read [safe deployment and troubleshooting](DOCUMENTATION/DEPLOYMENT.md).
+
+**Important:** Expose only `public/` via the web server document root.
+If the parent repository folder is web-visible, `.env`, dependencies and
+other private files could be exposed. Never run the alpha on a root account
+or shared PHP-FPM pool with access to other users' storage.

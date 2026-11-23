@@ -23,5 +23,7 @@ jobs:
         run: php tests/advanced-operations.php
       - name: Authenticated HTTP smoke suite
         run: bash tests/http-smoke.sh
+      - name: Nested public-path deployment smoke suite
+        run: bash tests/nested-installation.sh
       - name: JavaScript syntax validation
         run: node --check public/assets/app.js

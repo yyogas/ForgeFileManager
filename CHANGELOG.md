@@ -1,3 +1,15 @@
+## 0.2.1-alpha — 2026-11-23
+
+### Fixed
+- Resolve CSS, JS, API calls, uploads, image previews and downloads relative to the installation prefix instead of `/`.
+- Scope the PHP session cookie to its deployed URL prefix.
+- Add visible loading/failure hint and no-JavaScript fallback.
+
+### Quality and operations
+- Add a nested-directory HTTP deployment regression test to GitHub Actions.
+- Document secure webroot configuration and subdirectory troubleshooting.
+- Browser E2E remains blocked by the execution environment; no live-site visual confirmation.
+
 # Changelog
 
 ## 0.2.0-alpha — 2026-11-23

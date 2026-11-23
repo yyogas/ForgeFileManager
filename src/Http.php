@@ -16,7 +16,7 @@ final class Http
         session_name('FFMSESSID');
         session_set_cookie_params([
             'lifetime' => 0,
-            'path' => '/',
+            'path' => rtrim(str_replace('\\', '/', dirname((string) ($_SERVER['SCRIPT_NAME'] ?? '/api.php'))), '/') . '/',
             'secure' => $https,
             'httponly' => true,
             'samesite' => 'Strict',
@@ -100,7 +100,7 @@ final class Http
             );
             if ($method === 'GET') {
                 if ($action === 'me') {
-                    self::json(['ok' => true, 'username' => $username, 'csrf' => $_SESSION['csrf'], 'version' => '0.2.0-alpha', 'capabilities' => [
+                    self::json(['ok' => true, 'username' => $username, 'csrf' => $_SESSION['csrf'], 'version' => '0.2.1-alpha', 'capabilities' => [
                         'chmod' => true, 'upload' => true, 'zip' => class_exists(\ZipArchive::class),
                         'zipExtract' => false, 'trash' => false, 'copyDirectories' => true, 'checksum' => true,
                         'maxUploadBytes' => $fs->maxUploadBytes(),
