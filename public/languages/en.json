@@ -178,5 +178,10 @@
   "Cet accès aux fichiers d’exemple est en lecture seule.": "This sample-file access is read-only.",
   "Pagination des fichiers": "File pagination",
   "Page précédente": "Previous page",
-  "Page suivante": "Next page"
+  "Page suivante": "Next page",
+  "Aller à une page": "Go to a page",
+  "Numéro de page": "Page number",
+  "Aller": "Go",
+  "Numéro de page invalide.": "Invalid page number.",
+  "Réponse de pagination invalide.": "Invalid pagination response."
 }

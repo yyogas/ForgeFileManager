@@ -2,7 +2,7 @@
 
 **A modern, account-scoped PHP file manager for web hosting environments.**
 
-> **Status:** `v0.2.3-alpha` — an original, testable **UI + secure-core foundation**. Not production-ready. Not yet a replacement for cPanel File Manager. This repository has **not** imported the external `filemanager-master` distribution because `https://download.wcp360.com/?dir=filemanager-master` could not be retrieved during this development pass. An audited upstream import/migration remains pending; no upstream source code or provenance is falsely claimed.
+> **Status:** `v0.2.4-alpha` — an original, testable **UI + secure-core foundation**. Not production-ready. Not yet a replacement for cPanel File Manager. This repository has **not** imported the external `filemanager-master` distribution because `https://download.wcp360.com/?dir=filemanager-master` could not be retrieved during this development pass. An audited upstream import/migration remains pending; no upstream source code or provenance is falsely claimed.
 
 Forge File Manager is designed to provide a clean, responsive file-management experience for hosting users while enforcing access through a configured hosting-account filesystem root. The current implementation uses native PHP 8.2+, framework-free JavaScript and CSS with no runtime CDN dependency.
 
@@ -46,11 +46,11 @@ The username in the top-right header is returned by the authenticated server ses
 | Folder copy | Bounded recursive copies (max 100 MiB / 2,000 items / 20 levels), no symlinks, temporary private staging and best-effort rollback |
 | File integrity | On-demand SHA-256 checksum in the Properties dialog for readable regular files up to 100 MiB |
 | Context menu accessibility | Arrow Up / Down, Home, End navigation and menuitem semantics (browser acceptance still required) |
-| Interface | Flat responsive design, centered action sub-header, up to 25 entries per page, numbered pagination and vertically scrollable file area; dark/light mode, density options, bilingual English/French UI |
+| Interface | Flat responsive design, centered sub-header, **server-paginated** 25-item list/grid, numbered pages and a jump-to-page control, vertical scroll, dark/light themes, English/French UI |
 | Sample login | `demo / demo123` remains displayed only on the unconfigured sign-in page; there is no banner in the file manager. The backend still isolates this public access to read-only synthetic files. |
 | Testing | PHP filesystem tests and authenticated HTTP smoke tests |
 
-**Pagination note:** The UI displays at most **25 files/folders** per page, in both list and grid modes. Pagination follows current-folder filtering and sorting, and page changes clear the selection. The existing PHP listing API still caps a directory response at `FFM_MAX_ENTRIES` (default 2,000): full server-side pagination for extremely large directories remains future work.
+**Server pagination:** `GET /api.php?action=list&path=...&page=...&search=...&sort=...&hidden=...` sorts and filters the **whole directory on the server**, returns only **25 items per page**, and includes `total`, `pages`, `page`, `pageSize` and `hasNext`. Selection applies only to the current page; search and sort reset the page to 1. The jump-to-page control appears when there are more than 7 pages. The default maximum scan is **50,000 entries** (`FFM_LIST_SCAN_LIMIT`), configurable up to 200,000. Exceeding it returns HTTP 413 instead of a misleading truncated result. This is a bounded in-memory, offset-based directory scan (not an index or consistent snapshot); future cursor/indexed pagination is planned for extremely large or concurrently modified folders.
 
 **Not implemented yet:** recursive delete, safe extraction, recycle bin, file versioning, ACL management, advanced syntax highlighting, multi-tenant SSO, quota enforcement, background transfers, resumable chunks, external storage, search indexing, localization of remaining server errors, developer terminal, and plugin SDK. Buttons for unavailable operations are disabled or absent. The UI shows server disk usage **as server volume usage, not as an account quota**.
 
@@ -129,7 +129,8 @@ Never publish a script that generates or changes real hosting credentials from a
 | `FFM_PASSWORD_HASH` | Live mode | PHP `password_hash()` value; no default password |
 | `FFM_STORAGE_ROOT` | Live mode | Existing, account-owned filesystem root, never `/` |
 | `FFM_EDITOR_MAX_BYTES` | No | Max editor file size, default `1048576` bytes |
-| `FFM_MAX_ENTRIES` | No | Max results per listed directory, default `2000` |
+| `FFM_MAX_ENTRIES` | No | Limit used for bounded file operations (copy/ZIP); default `2000` |
+| `FFM_LIST_SCAN_LIMIT` | No | Maximum scanned directory entries before HTTP 413 (default `50000`, maximum `200000`) |
 | `FFM_UPLOAD_MAX_BYTES` | No | Max upload file size, default `104857600` bytes |
 | `FFM_ALLOW_WORLD_WRITABLE` | No | `0` by default; blocks modes granting write to others |
 | `FFM_ALLOW_HTTP_DEV` | No | Must be `0`/unset in production; only for local development |
@@ -177,7 +178,7 @@ node tests/ui-structure.test.js
 find src public bin tests -name '*.php' -print0 | xargs -0 -n1 php -l
 ```
 
-Optional offline Chromium tests `tests/browser-i18n.py` and `tests/browser-layout.py` verify locale switching, footer disk usage, no sidebar, a centered toolbar, 25-per-page pagination, search/sort behavior and restricted public sample credentials using mocked HTTP responses. Live-site browser E2E and accessibility review are still outstanding.
+Optional offline Chromium tests `tests/browser-i18n.py` and `tests/browser-layout.py` verify locale switching, footer disk usage, no sidebar, a centered toolbar, server-side 25-per-page pagination, search/sort behavior and jump-to-page and restricted public sample credentials using mocked HTTP responses. Live-site browser E2E and accessibility review are still outstanding.
 
 ## Project layout
 
@@ -192,6 +193,7 @@ Optional offline Chromium tests `tests/browser-i18n.py` and `tests/browser-layou
 │       ├── app.css           # Flat responsive design system
 │       └── app.js            # Explorer, context menus and dialogs
 ├── src/
+│   ├── DirectoryPager.php    # Server-side 25-item filtered/sorted pagination
 │   ├── Filesystem.php        # Account-scoped file operations
 │   ├── DemoFilesystem.php    # Virtual read-only example data
 │   ├── DeploymentMode.php    # Fail-closed deployment profile detection
@@ -201,7 +203,9 @@ Optional offline Chromium tests `tests/browser-i18n.py` and `tests/browser-layou
 ├── tests/
 │   ├── filesystem.php
 │   ├── http-smoke.sh
-│   ├── browser-layout.py  # Offline Chrome pagination verification
+│   ├── server-pagination.php # >2,000-item listing regression
+│   ├── server-pagination-http.sh # HTTP pagination and validation
+│   ├── browser-layout.py  # Offline Chrome pagination/jump verification
 │   ├── ui-structure.test.js  # Dependency-free CI checks
 │   └── browser-smoke.py      # Optional; not passed in this environment
 ├── DOCUMENTATION/

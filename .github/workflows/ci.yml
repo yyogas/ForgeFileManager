@@ -21,6 +21,10 @@ jobs:
         run: php tests/filesystem.php
       - name: Advanced filesystem operations suite
         run: php tests/advanced-operations.php
+      - name: Server pagination regression (more than 2,000 files)
+        run: php tests/server-pagination.php
+      - name: Server pagination HTTP contract
+        run: bash tests/server-pagination-http.sh
       - name: Authenticated HTTP smoke suite
         run: bash tests/http-smoke.sh
       - name: Nested public-path deployment smoke suite

@@ -219,6 +219,11 @@ h1,h2,h3 { margin: 0; }
 .pagination { min-height: 54px; display: flex; justify-content: space-between; align-items: center; gap: 14px; flex: 0 0 auto; }
 .pagination-summary { color: var(--text-soft); font-size: 12px; white-space: nowrap; }
 .pagination-buttons { display: flex; gap: 4px; align-items: center; justify-content: end; flex-wrap: wrap; }
+.pagination-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: flex-end; }
+.page-jump { display: flex; gap: 6px; align-items: center; font-size: 12px; color: var(--text-soft); }
+.page-jump input { width: 60px; height: 32px; padding: 4px 6px; font-size: 12px; border: 1px solid var(--line); border-radius: 7px; color: var(--text); background: var(--surface); }
+.page-jump button { padding-inline: 10px; }
+.files-container[aria-busy="true"] { opacity: .66; transition: opacity 120ms ease-in; }
 .page-button { border: 1px solid var(--line); background: var(--surface); color: var(--text); min-width: 32px; height: 32px; border-radius: 7px; font-size: 12px; padding: 0 7px; }
 .page-button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .page-button.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 700; }

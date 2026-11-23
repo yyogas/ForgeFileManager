@@ -15,8 +15,8 @@ header('Content-Security-Policy: default-src \'self\'; script-src \'self\'; styl
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#ffffff">
   <title>Forge File Manager</title>
-  <link rel="stylesheet" href="assets/app.css?v=0.2.3">
-  <script src="assets/app.js?v=0.2.3" defer></script>
+  <link rel="stylesheet" href="assets/app.css?v=0.2.4">
+  <script src="assets/app.js?v=0.2.4" defer></script>
 </head>
 <body>
 <svg class="svg-icons" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -84,7 +84,7 @@ header('Content-Security-Policy: default-src \'self\'; script-src \'self\'; styl
 </div>
 <div id="app" class="app hidden">
   <header class="topbar">
-    <div class="brand"><span class="brand-icon"><svg class="icon"><use href="#i-folder-open"/></svg></span><span class="brand-name">Forge <strong>File Manager</strong></span><span class="version-tag">0.2.3 ALPHA</span></div>
+    <div class="brand"><span class="brand-icon"><svg class="icon"><use href="#i-folder-open"/></svg></span><span class="brand-name">Forge <strong>File Manager</strong></span><span class="version-tag">0.2.4 ALPHA</span></div>
     <div class="topbar-right">
       <label class="language-choice header-language"><span class="sr-only">Langue</span><select id="header-language" aria-label="Langue"><option value="en">English</option><option value="fr">Français</option></select></label>
       <span class="topbar-label">Gestionnaire de fichiers</span>
@@ -127,7 +127,7 @@ header('Content-Security-Policy: default-src \'self\'; script-src \'self\'; styl
         <div class="panel-controls"><button class="view-button selected" id="list-view" title="Vue liste" aria-label="Vue liste"><svg class="icon"><use href="#i-list"/></svg></button><button class="view-button" id="grid-view" title="Vue grille" aria-label="Vue grille"><svg class="icon"><use href="#i-grid"/></svg></button></div>
       </div>
       <div class="list-tools">
-        <div class="search-field"><svg class="icon"><use href="#i-search"/></svg><input type="search" id="file-search" placeholder="Rechercher dans ce dossier…" aria-label="Filtrer les fichiers du dossier"></div>
+        <div class="search-field"><svg class="icon"><use href="#i-search"/></svg><input type="search" id="file-search" maxlength="100" placeholder="Rechercher dans ce dossier…" aria-label="Filtrer les fichiers du dossier"></div>
         <label class="hidden-switch" title="Afficher les fichiers cachés"><input type="checkbox" id="show-hidden"><span>Fichiers cachés</span></label>
         <select id="sort-by" aria-label="Trier les fichiers"><option value="name">Nom A-Z</option><option value="name-desc">Nom Z-A</option><option value="date">Plus récents</option><option value="size">Taille</option></select>
       </div>
@@ -139,7 +139,14 @@ header('Content-Security-Policy: default-src \'self\'; script-src \'self\'; styl
       </div>
       <nav id="pagination" class="pagination" aria-label="Pagination des fichiers">
         <span class="pagination-summary" id="pagination-summary" aria-live="polite">0 élément</span>
-        <div id="pagination-buttons" class="pagination-buttons"></div>
+        <div class="pagination-controls">
+          <div id="pagination-buttons" class="pagination-buttons"></div>
+          <form id="page-jump" class="page-jump hidden" aria-label="Aller à une page">
+            <label for="jump-page">Page</label>
+            <input id="jump-page" type="number" min="1" step="1" value="1" aria-label="Numéro de page" required>
+            <button class="page-button" type="submit">Aller</button>
+          </form>
+        </div>
       </nav>
     </main>
   </div>

@@ -61,4 +61,16 @@ Legend: `VERIFIED` (tested), `IMPLEMENTED` (code exists; not independently brows
 | Selection limited to currently visible page | VERIFIED locally | Browser fixture; selection cleared on page navigation |
 | Public sample username/password still displayed, no demo banner | VERIFIED locally | Browser UI checks |
 | Public sample access restricted to virtual read-only files | VERIFIED | Existing HTTP security checks |
-| Server-side pagination beyond `FFM_MAX_ENTRIES` | PLANNED | Existing API still caps responses at 2,000 entries by default |
+| Server-side pagination beyond `FFM_MAX_ENTRIES` | VERIFIED locally | 2,055 actual entries; HTTP pagination and Chromium fixture |
+
+## v0.2.4-alpha — server pagination
+
+| Feature | Status | Evidence |
+| --- | --- | --- |
+| 25 entries per server response | VERIFIED locally | `tests/server-pagination.php` and HTTP smoke |
+| Full-directory search/sort/hidden filter | VERIFIED locally | 2,055-file PHP fixture + HTTP query tests |
+| Current-page selection only | VERIFIED locally | Chromium offline fixture |
+| Debounced search, stale-request guard | IMPLEMENTED | JavaScript inspected; browser race test planned |
+| Jump to arbitrary page | VERIFIED locally | Chromium 301-file fixture; page 10 |
+| Directory scan limit / explicit HTTP 413 | VERIFIED locally | `tests/server-pagination.php` |
+| Cursor/snapshot pagination / indexed search | PLANNED | Offset results may shift under concurrent mutations |

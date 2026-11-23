@@ -58,6 +58,19 @@ Each checkbox is an engineering work item, not a product promise. Publish only t
 - Server disk usage moved to footer and labeled separately from account quota.
 - Only sample sign-in information remains; no demo-mode banner. Public test access remains restricted server-side.
 
-## Next: server-side pagination
+## v0.2.4 — complete: bounded server-side pagination
 
-Current responses remain capped by `FFM_MAX_ENTRIES=2000` by default. Introduce validated, paginated and sorted API contracts for very large directories and avoid eager transfer of thousands of metadata objects. Include concurrency, renames during paging, and search/index behavior tests.
+- [x] Return 25 rows per API request, with metadata for page/total/pages.
+- [x] Search, sort, hidden filter and directory-first order before slicing.
+- [x] Query validation, scan budget and honest HTTP 413 on oversized directories.
+- [x] Browser page-jump control; debounce; stale-request guard; current-page selection.
+- [x] Unit/HTTP fixtures beyond 2,000 entries; Chromium offline fixture.
+- [ ] Cursor/snapshot semantics for concurrent filesystem changes.
+- [ ] Index-backed search for directories larger than the scan budget.
+
+## Next: reliable recovery and archive handling
+
+- [ ] Versioned recycle-bin policy with retention/quota, per-account isolation, and file/folder restore.
+- [ ] ZIP extraction with path traversal, symlink and archive-bomb defenses.
+- [ ] Integrate controlled multi-selection operations with atomic preflight and audit.
+- [ ] Continue accessibility audits and real staging URL end-to-end tests.

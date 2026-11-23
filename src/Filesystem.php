@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace ForgeFileManager;
 
+require_once __DIR__ . '/DirectoryPager.php';
+
 use DirectoryIterator;
 use RuntimeException;
 
@@ -17,8 +19,9 @@ final class Filesystem
     private int $maxEditBytes;
     private int $maxEntries;
     private int $maxUploadBytes;
+    private int $maxListScan;
 
-    public function __construct(string $root, int $maxEditBytes = 1048576, int $maxEntries = 2000, int $maxUploadBytes = 104857600)
+    public function __construct(string $root, int $maxEditBytes = 1048576, int $maxEntries = 2000, int $maxUploadBytes = 104857600, int $maxListScan = 50000)
     {
         $real = realpath($root);
         if ($real === false || $real === DIRECTORY_SEPARATOR || !is_dir($real)) {
@@ -28,6 +31,7 @@ final class Filesystem
         $this->maxEditBytes = max(1024, $maxEditBytes);
         $this->maxEntries = max(10, $maxEntries);
         $this->maxUploadBytes = max(1, $maxUploadBytes);
+        $this->maxListScan = max(25, min(200000, $maxListScan));
     }
 
     public function maxUploadBytes(): int
@@ -130,36 +134,63 @@ final class Filesystem
         ];
     }
 
-    /** @return array<string, mixed> */
-    public function listing(string $relative = ''): array
+    /**
+     * Scan the directory within an explicit resource budget, sort/filter across
+     * the WHOLE folder, then return only 25 detailed metadata records.
+     * Exceeding the scan limit is an error, never a misleading partial total.
+     * @return array<string, mixed>
+     */
+    public function listing(string $relative = '', int $page = 1, string $search = '', string $sort = 'name', bool $showHidden = false): array
     {
         $relative = $this->relative($relative);
         $folder = $this->resolve($relative);
         if (!is_dir($folder) || !is_readable($folder)) {
             throw new FileError('Directory is not readable.', 403);
         }
-        $items = [];
-        $truncated = false;
+        $candidates = [];
         foreach (new DirectoryIterator($folder) as $entry) {
-            if ($entry->isDot()) {
-                continue;
+            if ($entry->isDot()) continue;
+            if (count($candidates) >= $this->maxListScan) {
+                throw new FileError('Directory scan limit reached. Increase FFM_LIST_SCAN_LIMIT for this account.', 413);
             }
-            if (count($items) >= $this->maxEntries) {
-                $truncated = true;
-                break;
-            }
-            $name = $entry->getFilename();
-            $path = $relative === '' ? $name : $relative . '/' . $name;
-            $items[] = $this->metadata($entry->getPathname(), $path, $name);
+            $absolute = $entry->getPathname();
+            $stat = @lstat($absolute);
+            // lstat avoids following symlinks outside the account boundary.
+            if ($stat === false) continue; // concurrent deletion
+            $dir = !is_link($absolute) && is_dir($absolute);
+            $candidates[] = [
+                'name' => $entry->getFilename(),
+                'type' => is_link($absolute) ? 'symlink' : ($dir ? 'directory' : 'file'),
+                'size' => $dir ? null : (int) $stat['size'],
+                'modified' => (int) $stat['mtime'],
+            ];
+        }
+        $paging = DirectoryPager::paginate($candidates, $page, $search, $sort, $showHidden);
+        $items = [];
+        foreach ($paging['items'] as $row) {
+            $name = $row['name'];
+            $relativePath = $relative === '' ? $name : $relative . '/' . $name;
+            $absolute = $folder . DIRECTORY_SEPARATOR . $name;
+            if (@lstat($absolute) === false) continue; // concurrent deletion
+            $items[] = $this->metadata($absolute, $relativePath, $name);
         }
         $diskTotal = @disk_total_space($this->root);
         $diskFree = @disk_free_space($this->root);
         return [
             'path' => $relative,
             'items' => $items,
-            'truncated' => $truncated,
-            'maxEntries' => $this->maxEntries,
-            'disk' => ['free' => $diskFree === false ? null : $diskFree, 'total' => $diskTotal === false ? null : $diskTotal, 'isAccountQuota' => false],
+            'page' => $paging['page'],
+            'pages' => $paging['pages'],
+            'pageSize' => $paging['pageSize'],
+            'total' => $paging['total'],
+            'hasNext' => $paging['hasNext'],
+            'truncated' => false,
+            'scanLimit' => $this->maxListScan,
+            'disk' => [
+                'free' => $diskFree === false ? null : $diskFree,
+                'total' => $diskTotal === false ? null : $diskTotal,
+                'isAccountQuota' => false,
+            ],
         ];
     }
 

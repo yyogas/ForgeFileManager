@@ -1,4 +1,4 @@
-# Architecture — v0.2.0-alpha
+# Architecture — v0.2.4-alpha
 
 ## Current composition
 
@@ -7,7 +7,8 @@
 - `public/assets/app.js`: frontend state; authentication, list fetching, context menu and dialogs.
 - `public/api.php`: single API entry point.
 - `src/Http.php`: authentication, server-session state, CSRF, dispatch, JSON and downloads.
-- `src/Filesystem.php`: strict relative paths, directory listing and authorized file operations.
+- `src/Filesystem.php`: strict relative paths, bounded directory scans, authorized file operations.
+- `src/DirectoryPager.php`: tested server-side search, directory-first sort, and 25-entry response slice.
 
 No database is used. Every request is checked against the configured environment and authenticated PHP session.
 
@@ -38,3 +39,23 @@ No privileged shell command runner; no direct root filesystem access; no FTP ser
 Directory copying is a synchronous, account-local operation. Before writing, the application traverses the source tree to check every path, reject symbolic links/special entries, and enforce hard limits (100 MiB total, 2,000 entries or configured lower threshold, 20 levels). A private randomly named staging path is created in the destination folder, populated, and renamed to the visible target. Failed copies attempt cleanup without following links. Destination name conflicts produce ` (copy)` / ` (copy 2)` names and cannot silently overwrite. These controls are best-effort with PHP pathname APIs and are not resistant to a malicious parallel process running as the same OS identity.
 
 The SHA-256 API only accepts authorized, readable regular files of at most 100 MiB, and returns their checksum and size. It does not sign or attest to file provenance. Upload size is also bounded by a configurable per-file `FFM_UPLOAD_MAX_BYTES` (100 MiB by default), independent of the PHP runtime post/upload limits.
+
+## Directory pagination contract — v0.2.4
+
+`GET api.php?action=list&path=<relative>&page=<positive integer>&search=<UTF-8>&sort=<name|name-desc|date|size>&hidden=<0|1>`
+
+All query parameters except `path` are optional. `page` defaults to 1, `search` to empty, `sort` to `name`, `hidden` to 0. `page` must be 1..1,000,000; search is bounded to 200 UTF-8 bytes. Invalid input returns HTTP 400.
+
+Example JSON data shape:
+
+```json
+{
+  "path": "public_html", "items": [], "total": 125, "page": 2,
+  "pages": 5, "pageSize": 25, "hasNext": true, "scanLimit": 50000,
+  "disk": {"free": null, "total": null, "isAccountQuota": false}
+}
+```
+
+The entire authorized directory is scanned and sorted before returning a maximum of 25 detailed entries. The scan stops with a **413** error when more than `FFM_LIST_SCAN_LIMIT` entries exist (default 50,000; maximum 200,000). Search is case-insensitive and uses `mb_stripos` when available. All directories sort ahead of regular files and symlinks; equal sort keys use name ordering. Both live and virtual read-only demo share the same paginator.
+
+This avoids transferring all records into the browser but is still an O(N log N) in-memory sort, not a database-backed indexed search. It is not transactionally consistent under concurrent renames/deletes; an entry may disappear between listing and rendering. Strong cursor/snapshot semantics remain future work. `FFM_MAX_ENTRIES` continues to constrain copy/ZIP operations independently.

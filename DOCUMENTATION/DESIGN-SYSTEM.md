@@ -45,4 +45,12 @@ The Copy action supports files and folders when `me.capabilities.copyDirectories
 - Vertical scroll bar stays inside the file listing rather than scrolling the whole page. Table headers are sticky.
 - Relocated the server-volume disk meter to the footer. If the server cannot provide usage, show "Unavailable" instead of inventing quota metrics.
 - Removed the visual read-only demo banner while retaining `demo / demo123` on an unconfigured login screen. Backend read-only virtual isolation is not weakened.
-- The current PHP API returns at most `FFM_MAX_ENTRIES` (default 2,000) per directory. The UI paginates those returned items; server-side cursor/offset pagination for bigger directories remains a separate backlog task.
+- Historical limitation resolved in v0.2.4: earlier responses returned at most `FFM_MAX_ENTRIES` entries. See server-side pagination below.
+
+## v0.2.4 — server pagination and navigation
+
+- The browser never holds more than the current 25 server rows. Search, sort and hidden-file filters execute on the server across the full directory.
+- The selection is cleared when paging or changing filters; selecting all affects only the current 25 entries.
+- Pagination includes previous/next, page numbers, range indicator and a direct jump field for folders longer than 7 pages.
+- Search requests are debounced (200 ms). Responses for superseded searches/pages are ignored instead of overwriting newer results.
+- The existing full-width UI, centered toolbar, sticky table header, vertical scroll area, footer storage meter and English/French support remain unchanged.

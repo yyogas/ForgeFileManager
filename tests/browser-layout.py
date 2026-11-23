@@ -15,6 +15,7 @@ fr=json.loads((r/'public/languages/fr.json').read_text())
 files=[dict(name=f'file-{i:03d}.txt',path=f'file-{i:03d}.txt',type='file',size=i,modified=1763856000+i,mode='644',readable=True,writable=False,extension='txt') for i in range(1,62)]
 mock="""
 window.demoLoggedIn = false;
+window.demoFiles = FILES;
 window.fetch = async (uri,opts={}) => {
  const url = new URL(String(uri), document.baseURI);
  const action = url.searchParams.get('action');
@@ -22,7 +23,17 @@ window.fetch = async (uri,opts={}) => {
  const payload = url.pathname.endsWith('en.json') ? EN : url.pathname.endsWith('fr.json') ? FR :
  action === 'me' ? (window.demoLoggedIn ? {ok:true,username:'demo',csrf:'token',capabilities:{readOnly:true,checksum:true,chmod:false,upload:false,copyDirectories:false,zip:false}} : {ok:false,error:'Authentication required'}) :
  action === 'login' ? {ok:true,username:'demo',csrf:'token'} :
- action === 'list' ? {ok:true,data:{path:url.searchParams.get('path')||'',items:FILES,truncated:false,maxEntries:2000,disk:{free:null,total:null,isAccountQuota:false}}} :
+ action === 'list' ? {ok:true,data:(() => {
+   window.listRequests = (window.listRequests || []).concat([{page:url.searchParams.get('page'),search:url.searchParams.get('search'),sort:url.searchParams.get('sort')}]);
+   const search=(url.searchParams.get('search')||'').toLocaleLowerCase();
+   const sort=url.searchParams.get('sort')||'name';
+   const hidden=url.searchParams.get('hidden')==='1';
+   let rows=window.demoFiles.filter(f=>(hidden || !f.name.startsWith('.')) && f.name.toLocaleLowerCase().includes(search));
+   rows.sort((a,b)=>sort==='date' ? b.modified-a.modified : sort==='size' ? b.size-a.size : a.name.localeCompare(b.name,undefined,{numeric:true})*(sort==='name-desc'?-1:1));
+   const total=rows.length, pages=Math.max(1,Math.ceil(total/25));
+   const page=Math.max(1,Math.min(Number(url.searchParams.get('page')||1),pages));
+   return {path:url.searchParams.get('path')||'',items:rows.slice((page-1)*25,page*25),total,pages,page,pageSize:25,hasNext:page<pages,disk:{free:null,total:null,isAccountQuota:false}};
+ })()} :
  {ok:false,error:'Unknown mock action'};
  return {ok:payload.ok!==false,status:payload.ok===false?401:200,json:async()=>payload};
 };
@@ -45,7 +56,7 @@ with sync_playwright() as p:
  assert page.locator('#file-rows tr').count()==25
  assert page.locator('#pagination-summary').inner_text()=='Items 1–25 of 61'
  assert page.locator('#disk-numbers').inner_text()=='Unavailable'
- page.screenshot(path='/mnt/data/forge-filemanager-0.2.3-desktop.png',full_page=True)
+ page.screenshot(path='/mnt/data/forge-filemanager-0.2.4-desktop.png',full_page=True)
  assert page.locator('.disk-meta small').inner_text()=='Server volume, not account quota'
  assert page.locator('.file-table').evaluate('(el) => el.closest("#files-container").scrollHeight >= el.closest("#files-container").clientHeight')
  assert page.locator('#files-container').evaluate('(el) => getComputedStyle(el).overflowY')=='scroll'
@@ -55,6 +66,7 @@ with sync_playwright() as p:
  page.get_by_role('button',name='Page 2',exact=True).click()
  assert page.locator('#file-rows tr').count()==25
  assert page.locator('#pagination-summary').inner_text()=='Items 26–50 of 61'
+ assert page.evaluate('window.listRequests.at(-1).page')=='2'
  page.get_by_role('button',name='Page 3',exact=True).click()
  assert page.locator('#file-rows tr').count()==11
  assert page.locator('#pagination-summary').inner_text()=='Items 51–61 of 61'
@@ -63,9 +75,12 @@ with sync_playwright() as p:
  page.get_by_role('button',name='Page 2',exact=True).click()
  assert '0 ' in page.locator('#selected-count').inner_text()
  page.locator('#file-search').fill('file-003')
+ page.wait_for_function("document.querySelector('#pagination-summary').textContent==='Items 1–1 of 1'")
+ assert page.evaluate('window.listRequests.at(-1).search')=='file-003'
  assert page.locator('#file-rows tr').count()==1
  assert page.locator('#pagination-summary').inner_text()=='Items 1–1 of 1'
  page.locator('#file-search').fill('')
+ page.wait_for_function("document.querySelector('#pagination-summary').textContent==='Items 1–25 of 61'")
  page.locator('#grid-view').click()
  assert page.locator('#file-grid .grid-file').count()==25
  page.locator('#header-language').select_option('fr')
@@ -76,7 +91,20 @@ with sync_playwright() as p:
  page.set_viewport_size({'width':390,'height':760})
  assert page.locator('#status-disk').count()==0 or page.locator('.status-disk').is_visible()
  assert page.locator('.sidebar').count()==0
- page.screenshot(path='/mnt/data/forge-filemanager-0.2.3-mobile.png',full_page=True)
+ page.screenshot(path='/mnt/data/forge-filemanager-0.2.4-mobile.png',full_page=True)
+ # The jump-to-page control appears for larger directories, without loading all rows.
+ page.evaluate('''window.demoFiles=Array.from({length:301},(_,i)=>({name:`file-${String(i+1).padStart(4,'0')}.txt`,path:`file-${String(i+1).padStart(4,'0')}.txt`,type:'file',size:i,modified:1763856000+i,mode:'644',readable:true,writable:false,extension:'txt'}));''')
+ page.locator('[data-action="refresh"]').click()
+ page.wait_for_function("document.querySelector('#pagination-summary').textContent==='Éléments 1–25 sur 301'")
+ assert page.locator('#page-jump').is_visible()
+ page.locator('#jump-page').fill('10')
+ page.locator('#page-jump button[type=submit]').click()
+ page.wait_for_function("document.querySelector('#pagination-summary').textContent==='Éléments 226–250 sur 301'")
+ assert page.evaluate('window.listRequests.at(-1).page')=='10'
+ page.locator('#sort-by').select_option('name-desc')
+ page.wait_for_function("document.querySelector('#pagination-summary').textContent==='Éléments 1–25 sur 301'")
+ assert page.evaluate('window.listRequests.at(-1).sort')=='name-desc'
+ assert page.locator('#file-grid .grid-file-name').first.inner_text()=='file-0301.txt'
  assert not errors,errors
- print('PASS: Chromium desktop 25/page, 61 items, paging, visible-page selection, filtering, grid, footer, i18n, safe sample credentials, centered toolbar')
+ print('PASS: Chromium server-backed paging, search, sorting, 301-item jump-to-page, selection, grid, footer, i18n, toolbar')
  browser.close()

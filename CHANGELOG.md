@@ -1,3 +1,18 @@
+## 0.2.4-alpha — 2026-11-23
+
+### Added / changed
+- **Real server-side pagination** of hosting directories with 25 entries per response, full-directory search, sort, and hidden-file filtering.
+- Stable directory-first natural sorting with explicit `page`, `pages`, `pageSize`, `total` and `hasNext` API fields.
+- Jump-to-page input for folders spanning more than seven pages; bounded vertical scrolling remains unchanged.
+- Debounced search and stale-response protection, with selection always limited to the current server page.
+- Configurable `FFM_LIST_SCAN_LIMIT` (default 50,000; hard maximum 200,000); HTTP 413 on overflow rather than silent truncation.
+- Regression suite for 2,055 real files, HTTP parameter validation, and Chromium 301-entry page-jump interaction.
+
+### Limitations
+- Sorting still scans the whole directory using bounded PHP memory; it is not backed by a database index or consistent snapshot.
+- Concurrent filesystem changes can shift offset pagination between requests. Cursor/continuation protocols and storage-provider adapters are future work.
+- Localhost browser E2E is blocked by sandbox policy; offline Chromium fixtures and HTTP smoke tests are available.
+
 # Changelog
 
 ## 0.2.3-alpha — 2026-11-23

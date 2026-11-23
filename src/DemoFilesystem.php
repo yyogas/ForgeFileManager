@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace ForgeFileManager;
 
+require_once __DIR__ . '/DirectoryPager.php';
+
 /**
  * Deliberately virtual, read-only demo. Never touches the hosting filesystem.
  * Do NOT map this identity to FFM_STORAGE_ROOT or grant it write capabilities.
@@ -33,7 +35,7 @@ final class DemoFilesystem
         return self::ENTRIES[$path] ?? null;
     }
 
-    public static function listing(string $path): array
+    public static function listing(string $path, int $page = 1, string $search = '', string $sort = 'name', bool $showHidden = false): array
     {
         if ($path !== '') {
             $entry = self::entry($path);
@@ -56,7 +58,8 @@ final class DemoFilesystem
                 'extension' => $directory ? '' : strtolower(pathinfo($name, PATHINFO_EXTENSION)),
             ];
         }
-        return ['path' => $path, 'items' => $items, 'truncated' => false, 'maxEntries' => 2000,
+        $pagination = DirectoryPager::paginate($items, $page, $search, $sort, $showHidden);
+        return ['path' => $path, ...$pagination, 'truncated' => false,
             'disk' => ['free' => null, 'total' => null, 'isAccountQuota' => false]];
     }
 

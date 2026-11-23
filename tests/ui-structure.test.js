@@ -12,11 +12,16 @@ assert(!html.includes('id="mobile-sidebar"'), 'Mobile sidebar toggle was not rem
 assert(!html.includes('id="demo-mode-flag"'), 'Demo banner still appears');
 assert(!html.includes('class="panel-heading"'), 'Redundant file explorer heading still appears');
 assert(html.includes('id="pagination-buttons"'));
+assert(html.includes('id="page-jump"'));
+assert(html.includes('id="jump-page"'));
 assert(html.includes('class="status-disk"'));
 assert(html.includes('id="disk-numbers"'));
 assert(html.includes('demo123'), 'Sample credentials missing from unconfigured sign-in');
 assert(js.includes('const PAGE_SIZE = 25;'));
-assert(js.includes('currentRows().slice((state.page-1)*PAGE_SIZE,state.page*PAGE_SIZE)'), 'Page-only selection missing');
+assert(js.includes('currentRows().forEach(f=>state.selected.add(f.path))'), 'Page-only selection missing');
+assert(js.includes("const data = await get('list',"), 'Server-backed paginated directory requests missing');
+assert(js.includes('state.total = data.total'), 'Server pagination total missing');
+assert(js.includes('state.pages = data.pages'), 'Server pagination page count missing');
 assert(js.includes('state.selected.clear();'), 'Selection should reset on page change');
 assert(css.includes('overflow-y: scroll'), 'Vertical scrolling should be available');
 for (const lang of ['en','fr']) {

@@ -20,7 +20,7 @@ window.fetch = async (uri, opts={}) => {
   const payload = u.pathname.endsWith('en.json') ? EN : u.pathname.endsWith('fr.json') ? FR :
    action === 'me' ? (window.demoLoggedIn ? {ok:true,username:'demo',csrf:'abc',demo:true,capabilities:{demo:true,readOnly:true,checksum:true,chmod:false,upload:false,copyDirectories:false,zip:false}} : {ok:false,error:'Authentication required'}) :
    action === 'login' ? {ok:true,username:'demo',csrf:'abc'} :
-   action === 'list' ? {ok:true,data:{path:u.searchParams.get('path')||'',items:[{name:'public_html',path:'public_html',type:'directory',size:null,modified:1763856000,mode:'755',readable:true,writable:false,extension:''}],truncated:false,maxEntries:2000,disk:{free:null,total:null,isAccountQuota:false}}} :
+   action === 'list' ? {ok:true,data:{path:u.searchParams.get('path')||'',items:[{name:'public_html',path:'public_html',type:'directory',size:null,modified:1763856000,mode:'755',readable:true,writable:false,extension:''}],page:1,pages:1,pageSize:25,total:1,disk:{free:null,total:null,isAccountQuota:false}}} :
    {ok:false,error:'Unknown test action'};
   return {ok:payload.ok!==false,status:payload.ok===false?401:200, json:async()=>payload};
 };

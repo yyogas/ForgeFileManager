@@ -178,5 +178,10 @@
   "Cet accès aux fichiers d’exemple est en lecture seule.": "Cet accès aux fichiers d’exemple est en lecture seule.",
   "Pagination des fichiers": "Pagination des fichiers",
   "Page précédente": "Page précédente",
-  "Page suivante": "Page suivante"
+  "Page suivante": "Page suivante",
+  "Aller à une page": "Aller à une page",
+  "Numéro de page": "Numéro de page",
+  "Aller": "Aller",
+  "Numéro de page invalide.": "Numéro de page invalide.",
+  "Réponse de pagination invalide.": "Réponse de pagination invalide."
 }

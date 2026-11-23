@@ -61,3 +61,7 @@ SHA-256 checksum requests require normal authenticated GET access, regular reada
 - Live configuration that uses `demo / demo123` is rejected.
 - No filesystem, session, or API isolation claim substitutes for a formal
   production deployment review. Only `public/` may be exposed via HTTP.
+
+## v0.2.4 — directory scan controls
+
+The authenticated list API now validates page, search, sort and hidden parameters and returns a maximum of 25 file metadata entries, with full-directory counts. The complete directory scan has a separate configurable upper bound (`FFM_LIST_SCAN_LIMIT`, default 50,000, capped at 200,000) and responds HTTP 413 when exceeded. This protects against silent truncation but does not eliminate the CPU/memory cost of an O(N log N) sort for large directories. Apply reverse-proxy request throttling and per-account runtime limits before production. The listing is an offset view, not an immutable snapshot, and concurrent writes may shift pages. Private account storage must remain isolated through the OS identity.

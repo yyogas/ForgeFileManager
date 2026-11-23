@@ -23,8 +23,8 @@
     username: '', csrf: '', path: '', items: [], selected: new Set(), capabilities: {},
     view: saved.view === 'grid' ? 'grid' : 'list',
     showHidden: !!saved.showHidden, theme: saved.theme === 'dark' ? 'dark' : 'light',
-    dense: !!saved.dense, language: ['fr','en'].includes(saved.language) ? saved.language : 'en', search: '', sort: saved.sort || 'name',
-    page: 1, disk: null, notices: [], modalCloser: null, busy: false
+    dense: !!saved.dense, language: ['fr','en'].includes(saved.language) ? saved.language : 'en', search: '', sort: ['name','name-desc','date','size'].includes(saved.sort) ? saved.sort : 'name',
+    page: 1, pages: 1, total: 0, disk: null, notices: [], modalCloser: null, busy: false
   };
   // Centralized, versioned English/French catalogs under public/languages/.
   // Source strings are French until the selected catalog is loaded.
@@ -139,6 +139,7 @@
   }
 
   function showLogin() {
+    listingSequence++; window.clearTimeout(searchTimer);
     $('#app').classList.add('hidden');
     $('#login-view').classList.remove('hidden');
     closeMenu(); closeModal();
@@ -199,39 +200,71 @@
     return file.extension ? file.extension.toUpperCase() : t('Fichier');
   }
   function parentDir(path) { return path.split('/').slice(0,-1).join('/'); }
-  function currentRows() {
-    let rows = state.items.filter(item => (state.showHidden || !item.name.startsWith('.')) &&
-      item.name.toLocaleLowerCase().includes(state.search.toLocaleLowerCase()));
-    rows = rows.sort((a,b) => {
-      if (a.type === 'directory' && b.type !== 'directory') return -1;
-      if (b.type === 'directory' && a.type !== 'directory') return 1;
-      if (state.sort === 'date') return (b.modified || 0) - (a.modified || 0);
-      if (state.sort === 'size') return (b.size || 0) - (a.size || 0);
-      return a.name.localeCompare(b.name, state.language, {numeric: true}) * (state.sort === 'name-desc' ? -1 : 1);
-    });
-    return rows;
-  }
+  // Only the current page lives in memory. Sorting/filtering is server-side.
+  function currentRows() { return state.items; }
+  let listingSequence = 0;
+  let searchTimer = null;
 
-  async function navigate(path) {
+  async function loadPage(path, page = 1, clearSearch = false) {
     closeMenu();
+    const seq = ++listingSequence;
+    const search = clearSearch ? '' : state.search;
+    $('#files-container').setAttribute('aria-busy', 'true');
     try {
-      const data = await get('list', {path});
+      const data = await get('list', {
+        path, page, search, sort: state.sort, hidden: state.showHidden ? '1' : '0'
+      });
+      if (seq !== listingSequence) return null; // Ignore stale network responses.
+      if (!Array.isArray(data.items) || data.items.length > PAGE_SIZE ||
+          !Number.isInteger(data.total) || data.total < 0 ||
+          !Number.isInteger(data.page) || !Number.isInteger(data.pages) ||
+          data.page < 1 || data.page > data.pages || data.pages < 1 ||
+          data.pageSize !== PAGE_SIZE || data.pages !== Math.max(1, Math.ceil(data.total/PAGE_SIZE))) {
+        throw Error(t('Réponse de pagination invalide.'));
+      }
       state.path = data.path;
-      state.items = data.items || [];
+      state.items = data.items;
+      state.total = data.total;
+      state.pages = data.pages;
+      state.page = data.page;
+      if (clearSearch) {
+        state.search = '';
+        $('#file-search').value = '';
+      }
       state.selected.clear();
-      state.page = 1;
-      $('#file-search').value = '';
-      state.search = '';
       renderBreadcrumbs();
       render();
       state.disk = data.disk;
       updateDisk(state.disk);
       $('#status-path').textContent = '/' + state.path;
-      if (data.truncated) toast(t('Affichage limité aux {count} premières entrées.',{count:data.maxEntries}), true);
+      $('#files-container').scrollTop = 0;
       return data;
-    } catch (error) { toast(error.message, true); throw error; }
+    } catch (error) {
+      if (seq === listingSequence) toast(error.message, true);
+      return null;
+    } finally {
+      if (seq === listingSequence) $('#files-container').removeAttribute('aria-busy');
+    }
   }
-  async function refresh() { await navigate(state.path); }
+
+  async function navigate(path) {
+    window.clearTimeout(searchTimer);
+    return loadPage(path, 1, true);
+  }
+  async function refresh() { return loadPage(state.path, state.page); }
+  function resetPage() {
+    ++listingSequence; // Also invalidates any in-flight page response.
+    state.page = 1;
+    state.selected.clear();
+    $('#files-container').scrollTop = 0;
+  }
+  function reloadFilters(debounce = false) {
+    resetPage();
+    window.clearTimeout(searchTimer);
+    if (debounce) searchTimer = window.setTimeout(() => void loadPage(state.path, 1), 200);
+    else void loadPage(state.path, 1);
+  }
+
   function renderBreadcrumbs() {
     const nav = $('#breadcrumbs'); nav.replaceChildren();
     const parts = state.path ? state.path.split('/') : [];
@@ -255,11 +288,9 @@
     $('#disk-numbers').textContent = `${prettySize(used)} / ${prettySize(disk.total)}`;
   }
   function render() {
-    const all = currentRows();
-    const pages = Math.max(1, Math.ceil(all.length / PAGE_SIZE));
+    const files = currentRows();
+    const pages = state.pages;
     state.page = Math.max(1, Math.min(state.page, pages));
-    const first = (state.page - 1) * PAGE_SIZE;
-    const files = all.slice(first, first + PAGE_SIZE);
     const rows = $('#file-rows');
     rows.innerHTML = files.map(file => {
       const [symbol,type] = typeIcon(file);
@@ -286,13 +317,13 @@
     $('#file-grid').classList.toggle('hidden', state.view !== 'grid');
     $('#empty-state').classList.toggle('hidden', files.length > 0);
     $('#empty-state strong').textContent = state.search ? t('none') : t('Dossier vide');
-    $('#status-count').textContent = t('{count} élément(s) · {selected} sélectionné(s)',{count:all.length,selected:state.selected.size});
+    $('#status-count').textContent = t('{count} élément(s) · {selected} sélectionné(s)',{count:state.total,selected:state.selected.size});
     $('#select-all').checked = files.length > 0 && files.every(f => state.selected.has(f.path));
     $('#select-all').indeterminate = files.some(f=>state.selected.has(f.path)) && !$('#select-all').checked;
     $('#selection-info').classList.toggle('hidden',state.selected.size === 0);
     $('#selected-count').textContent = `${state.selected.size} ${t('selected')}`;
     syncActionButtons();
-    renderPagination(all.length, pages);
+    renderPagination(state.total, pages);
     applyTranslations();
   }
 
@@ -328,19 +359,13 @@
       previous = page;
     }
     button('›', state.page + 1, state.page >= pages);
+    $('#page-jump').classList.toggle('hidden', pages <= 7);
+    $('#jump-page').max = String(pages);
+    $('#jump-page').value = String(state.page);
   }
   function switchPage(page) {
-    const totalPages = Math.max(1, Math.ceil(currentRows().length / PAGE_SIZE));
-    if (!Number.isInteger(page) || page < 1 || page > totalPages || page === state.page) return;
-    state.page = page;
-    state.selected.clear();
-    render();
-    $('#files-container').scrollTop = 0;
-  }
-  function resetPage() {
-    state.page = 1;
-    state.selected.clear();
-    $('#files-container').scrollTop = 0;
+    if (!Number.isInteger(page) || page < 1 || page > state.pages || page === state.page) return;
+    void loadPage(state.path, page);
   }
   function oneSelected() {
     if (state.selected.size !== 1) return null;
@@ -553,12 +578,12 @@
     $('#setting-hidden').checked=state.showHidden;
     $('#setting-theme').addEventListener('change',e=>{state.theme=e.target.value;preferences();});
     $('#setting-dense').addEventListener('change',e=>{state.dense=e.target.checked;preferences();});
-    $('#setting-hidden').addEventListener('change',e=>{state.showHidden=e.target.checked;resetPage();preferences();render();});
+    $('#setting-hidden').addEventListener('change',e=>{state.showHidden=e.target.checked;preferences();reloadFilters();});
   }
   function profileDialog() {
     const content = `<p><strong>Compte connecté :</strong> ${escapeHtml(state.username)}</p>
       <p><strong>Racine autorisée :</strong> / (racine du compte, non racine Linux)</p>
-      <p><strong>Version :</strong> 0.2.3-alpha</p>
+      <p><strong>Version :</strong> 0.2.4-alpha</p>
       <p>Cette version utilise une authentification autonome. Les profils revendeurs, le SSO et les quotas par compte sont prévus pour une version ultérieure.</p>`;
     openModal('Mon compte',content,[{text:'Fermer',run:closeModal}],{kicker:'COMPTE HÉBERGEMENT'});
   }
@@ -681,20 +706,26 @@
     if(e.target.id==='files-container') {state.selected.clear();render();}
   });
   $('#select-all').addEventListener('change',e=>{
-    if(e.target.checked) currentRows().slice((state.page-1)*PAGE_SIZE,state.page*PAGE_SIZE).forEach(f=>state.selected.add(f.path));
+    if(e.target.checked) currentRows().forEach(f=>state.selected.add(f.path));
     else state.selected.clear();
     render();
   });
   $('#clear-selection').addEventListener('click',()=>{state.selected.clear();render();});
-  $('#file-search').addEventListener('input',e=>{state.search=e.target.value;resetPage();render();});
-  $('#sort-by').addEventListener('change',e=>{state.sort=e.target.value;resetPage();preferences();render();});
-  $('#show-hidden').addEventListener('change',e=>{state.showHidden=e.target.checked;resetPage();preferences();render();});
+  $('#file-search').addEventListener('input',e=>{state.search=e.target.value;reloadFilters(true);});
+  $('#sort-by').addEventListener('change',e=>{state.sort=e.target.value;preferences();reloadFilters();});
+  $('#show-hidden').addEventListener('change',e=>{state.showHidden=e.target.checked;preferences();reloadFilters();});
   $('#list-view').addEventListener('click',()=>{state.view='list';preferences();render();});
   $('#pagination-buttons').addEventListener('click',e=>{
     const btn=e.target.closest('button[data-page]');
     if (btn && !btn.disabled) switchPage(Number(btn.dataset.page));
   });
   $('#grid-view').addEventListener('click',()=>{state.view='grid';preferences();render();});
+  $('#page-jump').addEventListener('submit',e=>{
+    e.preventDefault();
+    const page = Number($('#jump-page').value);
+    if (Number.isInteger(page) && page >= 1 && page <= state.pages) switchPage(page);
+    else toast(t('Numéro de page invalide.'), true);
+  });
   $('#profile-btn').addEventListener('click',()=>{
     const dropdown=$('#profile-dropdown');const willOpen=dropdown.classList.contains('hidden');
     closeMenu();dropdown.classList.toggle('hidden',!willOpen);
@@ -755,7 +786,7 @@
     if(editing)return;
     if(e.key==='F2'&&oneSelected()){e.preventDefault();void executeAction('rename');}
     if(e.key==='Delete'&&oneSelected()){e.preventDefault();void executeAction('delete');}
-    if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='a'){e.preventDefault();currentRows().slice((state.page-1)*PAGE_SIZE,state.page*PAGE_SIZE).forEach(f=>state.selected.add(f.path));render();}
+    if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='a'){e.preventDefault();currentRows().forEach(f=>state.selected.add(f.path));render();}
     if((e.shiftKey&&e.key==='F10')||e.key==='ContextMenu'){
       e.preventDefault();openContext(oneSelected(),Math.round(window.innerWidth/2),Math.round(window.innerHeight/2));
     }

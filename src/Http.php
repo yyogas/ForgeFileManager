@@ -107,13 +107,13 @@ final class Http
                 // an unsafe storage root is supplied in the environment.
                 if ($method === 'GET' && $action === 'me') {
                     self::json(['ok' => true, 'username' => 'demo', 'csrf' => $_SESSION['csrf'],
-                        'version' => '0.2.3-alpha', 'demo' => true,
+                        'version' => '0.2.4-alpha', 'demo' => true,
                         'capabilities' => ['demo' => true, 'readOnly' => true, 'chmod' => false,
                             'upload' => false, 'zip' => false, 'zipExtract' => false, 'trash' => false,
                             'copyDirectories' => false, 'checksum' => true, 'maxUploadBytes' => 0]]);
                 }
                 if ($method === 'GET' && $action === 'list') {
-                    self::json(['ok' => true, 'data' => DemoFilesystem::listing(self::getString('path'))]);
+                    self::json(['ok' => true, 'data' => DemoFilesystem::listing(self::getString('path'), ...self::listParameters())]);
                 }
                 if ($method === 'GET' && $action === 'read') {
                     self::json(['ok' => true, 'data' => DemoFilesystem::readText(self::getString('path'))]);
@@ -132,18 +132,19 @@ final class Http
                 $storageRoot,
                 (int) (getenv('FFM_EDITOR_MAX_BYTES') ?: 1048576),
                 (int) (getenv('FFM_MAX_ENTRIES') ?: 2000),
-                (int) (getenv('FFM_UPLOAD_MAX_BYTES') ?: 104857600)
+                (int) (getenv('FFM_UPLOAD_MAX_BYTES') ?: 104857600),
+                (int) (getenv('FFM_LIST_SCAN_LIMIT') ?: 50000)
             );
             if ($method === 'GET') {
                 if ($action === 'me') {
-                    self::json(['ok' => true, 'username' => $username, 'csrf' => $_SESSION['csrf'], 'version' => '0.2.3-alpha', 'capabilities' => [
+                    self::json(['ok' => true, 'username' => $username, 'csrf' => $_SESSION['csrf'], 'version' => '0.2.4-alpha', 'capabilities' => [
                         'chmod' => true, 'upload' => true, 'zip' => class_exists(\ZipArchive::class),
                         'zipExtract' => false, 'trash' => false, 'copyDirectories' => true, 'checksum' => true,
                         'maxUploadBytes' => $fs->maxUploadBytes(),
                     ]]);
                 }
                 if ($action === 'list') {
-                    self::json(['ok' => true, 'data' => $fs->listing(self::getString('path'))]);
+                    self::json(['ok' => true, 'data' => $fs->listing(self::getString('path'), ...self::listParameters())]);
                 }
                 if ($action === 'checksum') {
                     self::json(['ok' => true, 'data' => $fs->checksum(self::getString('path'))]);
@@ -226,6 +227,22 @@ final class Http
             throw new FileError('Request body must be valid JSON.', 400);
         }
         return $data;
+    }
+
+    /** @return array{int, string, string, bool} */
+    private static function listParameters(): array
+    {
+        $page = (string) ($_GET['page'] ?? '1');
+        $search = $_GET['search'] ?? '';
+        $sort = $_GET['sort'] ?? 'name';
+        $hidden = (string) ($_GET['hidden'] ?? '0');
+        if (!preg_match('/^[1-9][0-9]{0,6}$/D', $page) || (int) $page > 1000000 ||
+            !is_string($search) || strlen($search) > 200 || preg_match('//u', $search) !== 1 ||
+            !is_string($sort) || !in_array($sort, DirectoryPager::SORTS, true) ||
+            !in_array($hidden, ['0', '1'], true)) {
+            throw new FileError('Invalid directory listing parameters.', 400);
+        }
+        return [(int) $page, $search, $sort, $hidden === '1'];
     }
 
     private static function getString(string $name): string
