@@ -175,7 +175,11 @@ final class Http
     /** @return array<string, mixed> */
     private static function body(): array
     {
-        $input = file_get_contents('php://input');
+        // A bounded read prevents oversized JSON requests exhausting PHP memory.
+        $input = file_get_contents('php://input', false, null, 0, 4 * 1024 * 1024 + 1);
+        if ($input === false || strlen($input) > 4 * 1024 * 1024) {
+            throw new FileError('JSON request body exceeds the 4 MB limit.', 413);
+        }
         $data = json_decode($input === false ? '' : $input, true);
         if (!is_array($data)) {
             throw new FileError('Request body must be valid JSON.', 400);
