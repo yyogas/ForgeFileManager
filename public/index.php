@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require_once dirname(__DIR__) . '/src/DeploymentMode.php';
 $testSandbox = \ForgeFileManager\DeploymentMode::sandboxEnabled();
+$publicShowcase = getenv('FFM_PUBLIC_SHOWCASE') === '1';
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: DENY');
 header('Referrer-Policy: no-referrer');
@@ -15,8 +16,8 @@ header('Content-Security-Policy: default-src \'self\'; script-src \'self\'; styl
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#ffffff">
   <title>Forge File Manager</title>
-  <link rel="stylesheet" href="assets/app.css?v=0.2.7">
-  <script src="assets/app.js?v=0.2.7" defer></script>
+  <link rel="stylesheet" href="assets/app.css?v=0.2.8">
+  <script src="assets/app.js?v=0.2.8" defer></script>
 </head>
 <body>
 <svg class="svg-icons" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -71,9 +72,9 @@ header('Content-Security-Policy: default-src \'self\'; script-src \'self\'; styl
     <p>Accédez aux fichiers autorisés de votre compte d'hébergement.</p>
     <label class="language-choice"><span>Langue</span><select id="login-language" aria-label="Langue"><option value="en">English</option><option value="fr">Français</option></select></label>
     
-    <div class="login-credentials"><strong>Identifiants de connexion</strong><p><span>Utilisateur :</span> <code>demo</code> <span>Mot de passe :</span> <code>demo123</code></p><small>Identifiants réservés aux essais locaux isolés. Inactifs sur un hébergement réel.</small></div>
+    <div class="login-credentials"><strong>Identifiants de connexion</strong><p><span>Utilisateur :</span> <code>demo</code> <span>Mot de passe :</span> <code>demo123</code></p><small><?php if ($publicShowcase): ?>Présentation publique en lecture seule : uniquement des fichiers d’exemple.<?php else: ?>Identifiants réservés aux essais locaux isolés. Inactifs sur un hébergement réel.<?php endif; ?></small></div>
     <form id="login-form">
-      <label for="login-username">Identifiant</label><input id="login-username" name="username" autocomplete="username" <?php if ($testSandbox): ?>value="demo"<?php endif; ?> required>
+      <label for="login-username">Identifiant</label><input id="login-username" name="username" autocomplete="username" <?php if ($testSandbox || $publicShowcase): ?>value="demo"<?php endif; ?> required>
       <label for="login-password">Mot de passe</label><input type="password" id="login-password" name="password" autocomplete="current-password"  required>
       <button class="btn btn-primary btn-full" type="submit">Se connecter</button>
       <div id="login-error" class="form-error" role="alert"></div>
@@ -83,7 +84,7 @@ header('Content-Security-Policy: default-src \'self\'; script-src \'self\'; styl
 </div>
 <div id="app" class="app hidden">
   <header class="topbar">
-    <div class="brand"><span class="brand-icon"><svg class="icon"><use href="#i-folder-open"/></svg></span><span class="brand-name">Forge <strong>File Manager</strong></span><span class="version-tag">0.2.6 ALPHA</span></div>
+    <div class="brand"><span class="brand-icon"><svg class="icon"><use href="#i-folder-open"/></svg></span><span class="brand-name">Forge <strong>File Manager</strong></span><span class="version-tag">0.2.8 ALPHA</span></div>
     <div class="topbar-right">
       <label class="language-choice header-language"><span class="sr-only">Langue</span><select id="header-language" aria-label="Langue"><option value="en">English</option><option value="fr">Français</option></select></label>
       <span class="topbar-label">Gestionnaire de fichiers</span>

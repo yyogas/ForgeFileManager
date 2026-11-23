@@ -204,5 +204,6 @@
   "Extraction ZIP indisponible.": "Extraction ZIP indisponible.",
   "Extraire « {file} » dans un nouveau dossier sans écraser les fichiers existants ? Limite de 100 Mio.": "Extraire « {file} » dans un nouveau dossier sans écraser les fichiers existants ? Limite de 100 Mio.",
   "Archive extraite vers {path}": "Archive extraite vers {path}",
-  "Extraire le ZIP dans un nouveau dossier": "Extraire le ZIP dans un nouveau dossier"
+  "Extraire le ZIP dans un nouveau dossier": "Extraire le ZIP dans un nouveau dossier",
+  "Présentation publique en lecture seule : uniquement des fichiers d’exemple.": "Présentation publique en lecture seule : uniquement des fichiers d’exemple."
 }

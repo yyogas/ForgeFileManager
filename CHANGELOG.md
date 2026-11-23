@@ -1,3 +1,18 @@
+## 0.2.8-alpha — 2026-11-23
+
+### Added
+- Explicit PUBLIC SHOWCASE mode: browser-accessible `demo / demo123` login with real, deliberately synthetic sample files only.
+- Dedicated CLI-only fixture installer (`bin/prepare-public-showcase.php`) requiring an empty, private, non-root-owned directory.
+- Public-mode fixed file allowlist, sample checksums, secure root/owner checks and no mixed live hosting credentials.
+- Public showcase HTTP and PHP regression tests, including forbidden mutations, marker hiding and unexpected-file fail-closed checks.
+- Public showcase hosting guide with isolated PHP-FPM profile and HTTPS deployment instructions.
+
+### Security
+- Public showcase is strictly read-only on the server; writing actions return HTTP 403 even with a valid session and CSRF token.
+- Public showcase cannot share the same PHP-FPM configuration as a live hosting account.
+- Previous localhost-only test sandbox remains available independently; old virtual demo remains removed.
+- Public deployment requires operator configuration and review; updating GitHub does not deploy to test.wcp360.com.
+
 ## 0.2.7-alpha — 2026-11-23
 
 ### Security and integrity hardening

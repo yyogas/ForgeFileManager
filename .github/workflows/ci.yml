@@ -21,6 +21,10 @@ jobs:
         run: php tests/integrity-isolation.php
       - name: HTTP isolation, editor, permissions and ZIP integration
         run: bash tests/integrity-http.sh
+      - name: Public showcase fixture security regression
+        run: php tests/public-showcase.php
+      - name: Public showcase read-only authenticated HTTP regression
+        run: bash tests/public-showcase-http.sh
       - name: PHP syntax validation
         run: find src public bin tests -name '*.php' -print0 | xargs -0 -n1 php -l
       - name: Filesystem regression suite

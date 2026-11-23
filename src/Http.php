@@ -55,17 +55,22 @@ final class Http
                 throw new FileError('The old virtual demo mode was removed; configure a live account or an isolated local test sandbox.', 503);
             }
             $sandbox = DeploymentMode::sandboxEnabled();
-            $username = $sandbox ? 'demo' : (string) getenv('FFM_USERNAME');
-            $hash = $sandbox ? '' : (string) getenv('FFM_PASSWORD_HASH');
-            $storageRoot = $sandbox ? DeploymentMode::sandboxRoot() : (string) getenv('FFM_STORAGE_ROOT');
-            if (!$sandbox && ($username === '' || $hash === '' || $storageRoot === '' || !is_dir($storageRoot))) {
+            $showcase = PublicShowcase::enabled();
+            if ($sandbox && $showcase) {
+                throw new FileError('Local test sandbox and public showcase cannot be combined.', 503);
+            }
+            $username = ($sandbox || $showcase) ? 'demo' : (string) getenv('FFM_USERNAME');
+            $hash = ($sandbox || $showcase) ? '' : (string) getenv('FFM_PASSWORD_HASH');
+            $storageRoot = $showcase ? PublicShowcase::root() : ($sandbox ? DeploymentMode::sandboxRoot() : (string) getenv('FFM_STORAGE_ROOT'));
+            if (!$sandbox && !$showcase && ($username === '' || $hash === '' || $storageRoot === '' || !is_dir($storageRoot))) {
                 throw new FileError('Forge File Manager is not configured. Set FFM_USERNAME, FFM_PASSWORD_HASH and FFM_STORAGE_ROOT.', 503);
             }
-            if (!$sandbox && $username === 'demo' && password_verify('demo123', $hash)) {
+            if (!$sandbox && !$showcase && $username === 'demo' && password_verify('demo123', $hash)) {
                 throw new FileError('Public demo/demo123 credentials cannot access hosting files.', 503);
             }
-            IsolationGuard::assertAccount($storageRoot, $sandbox);
-            $accountBinding = IsolationGuard::binding($username, $storageRoot, $hash, $sandbox);
+            IsolationGuard::assertAccount($storageRoot, $sandbox || $showcase);
+            $accountBinding = IsolationGuard::binding($username, $storageRoot, $hash, $sandbox, $showcase);
+            $sessionMode = $showcase ? 'public-showcase' : ($sandbox ? 'sandbox' : 'live');
             $action = (string) ($_GET['action'] ?? 'me');
             $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
             if ($action === 'login' && $method === 'POST') {
@@ -77,7 +82,7 @@ final class Http
                 }
                 if (!is_string($body['username'] ?? null) || !is_string($body['password'] ?? null) ||
                     !hash_equals($username, $body['username']) ||
-                    !($sandbox ? hash_equals('demo123', $body['password']) : password_verify($body['password'], $hash))) {
+                    !(($sandbox || $showcase) ? hash_equals('demo123', $body['password']) : password_verify($body['password'], $hash))) {
                     $_SESSION['failed_login_count'] = $failures + 1;
                     $_SESSION['failed_login_at'] = time();
                     throw new FileError('Invalid credentials.', 401);
@@ -85,7 +90,7 @@ final class Http
                 session_regenerate_id(true);
                 $_SESSION = [
                     'username' => $username,
-                    'mode' => $sandbox ? 'sandbox' : 'live',
+                    'mode' => $sessionMode,
                     'account_binding' => $accountBinding,
                     'csrf' => bin2hex(random_bytes(32)),
                     'authenticated_at' => time(),
@@ -93,7 +98,7 @@ final class Http
                 self::json(['ok' => true, 'username' => $username, 'csrf' => $_SESSION['csrf']]);
             }
             if (($_SESSION['username'] ?? '') !== $username ||
-                ($_SESSION['mode'] ?? '') !== ($sandbox ? 'sandbox' : 'live') ||
+                ($_SESSION['mode'] ?? '') !== $sessionMode ||
                 !hash_equals($accountBinding, (string) ($_SESSION['account_binding'] ?? '')) ||
                 !isset($_SESSION['authenticated_at'])) {
                 throw new FileError('Authentication required.', 401);
@@ -118,7 +123,7 @@ final class Http
             );
             // A private recycle bin must be explicitly configured; absent this
             // capability, HTTP deletes fail closed and never become permanent.
-            $trashSetting = (string) getenv($sandbox ? 'FFM_TEST_TRASH_ROOT' : 'FFM_TRASH_ROOT');
+            $trashSetting = $showcase ? '' : (string) getenv($sandbox ? 'FFM_TEST_TRASH_ROOT' : 'FFM_TRASH_ROOT');
             $trash = $trashSetting === '' ? null : new Trash($fs->root(), $trashSetting);
             if ($method === 'GET' && $action === 'trash-list') {
                 if ($trash === null) throw new FileError('Private recycle bin is not configured.', 503);
@@ -130,22 +135,30 @@ final class Http
             }
             if ($method === 'GET') {
                 if ($action === 'me') {
-                    self::json(['ok' => true, 'username' => $username, 'csrf' => $_SESSION['csrf'], 'version' => '0.2.7-alpha', 'capabilities' => [
-                        'chmod' => true, 'upload' => true, 'zip' => class_exists(\ZipArchive::class),
-                        'zipExtract' => class_exists(\ZipArchive::class), 'bulkTransfer' => true, 'trash' => $trash !== null, 'testSandbox' => $sandbox, 'copyDirectories' => true, 'checksum' => true,
-                        'maxUploadBytes' => $fs->maxUploadBytes(),
+                    self::json(['ok' => true, 'username' => $username, 'csrf' => $_SESSION['csrf'], 'version' => '0.2.8-alpha', 'capabilities' => [
+                        'readOnly' => $showcase, 'publicShowcase' => $showcase,
+                        'chmod' => !$showcase, 'upload' => !$showcase, 'zip' => !$showcase && class_exists(\ZipArchive::class),
+                        'zipExtract' => !$showcase && class_exists(\ZipArchive::class), 'bulkTransfer' => !$showcase, 'trash' => $trash !== null, 'testSandbox' => $sandbox, 'copyDirectories' => !$showcase, 'checksum' => true,
+                        'maxUploadBytes' => $showcase ? 0 : $fs->maxUploadBytes(),
                     ]]);
                 }
                 if ($action === 'list') {
-                    self::json(['ok' => true, 'data' => $fs->listing(self::getString('path'), ...self::listParameters())]);
+                    $path = self::getString('path');
+                    if ($showcase) PublicShowcase::assertAllowedPath($path);
+                    $params = self::listParameters();
+                    if ($showcase) $params[3] = false; // Never enumerate hidden showcase manifest.
+                    self::json(['ok' => true, 'data' => $fs->listing($path, ...$params)]);
                 }
                 if ($action === 'checksum') {
+                    if ($showcase) PublicShowcase::assertAllowedPath(self::getString('path'));
                     self::json(['ok' => true, 'data' => $fs->checksum(self::getString('path'))]);
                 }
                 if ($action === 'read') {
+                    if ($showcase) PublicShowcase::assertAllowedPath(self::getString('path'));
                     self::json(['ok' => true, 'data' => $fs->readText(self::getString('path'))]);
                 }
                 if ($action === 'download') {
+                    if ($showcase) PublicShowcase::assertAllowedPath(self::getString('path'));
                     [$handle, $name, $size] = $fs->openFileForRead(self::getString('path'));
                     header('Content-Type: application/octet-stream');
                     header('Content-Disposition: attachment; filename="' . addcslashes($name, '"\\') . '"; filename*=UTF-8\'\'' . rawurlencode($name));
@@ -166,6 +179,7 @@ final class Http
                     exit;
                 }
                 if ($action === 'preview') {
+                    if ($showcase) PublicShowcase::assertAllowedPath(self::getString('path'));
                     [$handle, , $size] = $fs->openFileForRead(self::getString('path'));
                     try {
                         if ($size > 10 * 1024 * 1024) {
@@ -193,6 +207,11 @@ final class Http
                 $_SESSION = [];
                 session_regenerate_id(true);
                 self::json(['ok' => true]);
+            }
+            // Publicly known credentials never authorize any filesystem mutation.
+            // Keep this server-side guard ahead of all write handlers.
+            if ($showcase) {
+                throw new FileError('Public showcase is read-only; changes are forbidden.', 403);
             }
             if ($action === 'upload') {
                 if (!isset($_FILES['file']) || !is_array($_FILES['file'])) {

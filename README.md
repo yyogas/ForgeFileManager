@@ -2,9 +2,35 @@
 
 **A modern, account-scoped PHP file manager for web hosting environments.**
 
-> **Status:** `v0.2.7-alpha` — an original, testable **UI + secure-core foundation**. Not production-ready. Not yet a replacement for cPanel File Manager. This repository has **not** imported the external `filemanager-master` distribution because `https://download.wcp360.com/?dir=filemanager-master` could not be retrieved during this development pass. An audited upstream import/migration remains pending; no upstream source code or provenance is falsely claimed.
+> **Status:** `v0.2.8-alpha` — an original, testable **UI + secure-core foundation**. Not production-ready. Not yet a replacement for cPanel File Manager. This repository has **not** imported the external `filemanager-master` distribution because `https://download.wcp360.com/?dir=filemanager-master` could not be retrieved during this development pass. An audited upstream import/migration remains pending; no upstream source code or provenance is falsely claimed.
 
 Forge File Manager is designed to provide a clean, responsive file-management experience for hosting users while enforcing access through a configured hosting-account filesystem root. The current implementation uses native PHP 8.2+, framework-free JavaScript and CSS with no runtime CDN dependency.
+
+## Public access — explicitly isolated read-only showcase
+
+To show Forge File Manager to the public, operators may **explicitly**
+enable `FFM_PUBLIC_SHOWCASE=1` on a *separate* dedicated PHP-FPM pool
+and configure `FFM_PUBLIC_SHOWCASE_ROOT` to a private directory
+containing only synthetic sample files created by
+`php bin/prepare-public-showcase.php /absolute/private/empty/directory`.
+
+Visitors can sign in at the public HTTPS URL with **demo / demo123**.
+They can browse, search, preview and download **sample data only**.
+**No writes are authorized**: edit/save, CHMOD, upload, rename, move,
+copy, ZIP creation/extraction and deletion return HTTP 403 even when
+the caller makes a direct authenticated API request.
+
+Public showcase refuses any real `FFM_USERNAME`, `FFM_PASSWORD_HASH`,
+`FFM_STORAGE_ROOT` or `FFM_TRASH_ROOT`. The fixed sample manifest is
+verified on each request. Unexpected files or modified samples cause
+HTTP 503 instead of disclosing data. The former automatic virtual
+demo remains disabled; this separate public mode is deliberately
+opt-in and **not a real hosting account**.
+
+**Full setup:** [PUBLIC-SHOWCASE.md](DOCUMENTATION/PUBLIC-SHOWCASE.md).
+Updating the GitHub code does **not** deploy or configure
+`test.wcp360.com`; a dedicated non-root PHP-FPM pool and an HTTPS
+vhost exposing only `public/` are required.
 
 ## UI preview: product structure
 
@@ -66,9 +92,9 @@ The username in the top-right header is returned by the authenticated server ses
 
 No database, Node build system or Composer installation is required for the first alpha.
 
-## Test login: credentials shown, virtual demonstration disabled
+## Authentication profiles: real hosting, public showcase, local test
 
-The previous **automatic virtual demo has been removed**. The login screen
+The previous **automatic virtual demo has been removed**. A separately configured, read-only public showcase is now available as described above. The login screen
 still displays these known, **test-only** credentials:
 
 - Username: `demo`
@@ -289,7 +315,7 @@ A publicly accessible parent `/ForgeFileManager/` can expose private files
 (e.g. `.env`, docs or dependencies), even when `/public/` itself appears to work.
 Never leave real hosting data or live credentials on an unreviewed alpha deployment.
 
-## v0.2.7-alpha — secure ZIP extraction and batch transfers
+## v0.2.8-alpha — secure ZIP extraction and batch transfers
 
 - ZIP files are inspected and extracted **only** into a new, collision-free directory after entry path/type/CRC/size/rate checks; no overwrites or general-purpose arbitrary archive extraction. Requires ext-zip.
 - Multi-selection Copy/Move handles **1–25 items** per synchronous request and returns item-level results; partial success is explicitly reported and not automatically rolled back.
@@ -299,7 +325,7 @@ Never leave real hosting data or live credentials on an unreviewed alpha deploym
 See [archive and multi-selection contracts](DOCUMENTATION/ARCHIVES-AND-BULK.md). Never treat this alpha as production-ready without staging verification and an independent security review.
 
 
-## v0.2.7-alpha — isolation and filesystem correctness hardening
+## v0.2.8-alpha — isolation and filesystem correctness hardening
 
 The following behavior is **implemented and locally regression-tested**:
 

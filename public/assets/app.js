@@ -150,6 +150,8 @@
     state.csrf = payload.csrf;
     state.capabilities = payload.capabilities ?? {};
     const readOnly = !!state.capabilities.readOnly;
+    $('#show-hidden').disabled = readOnly;
+    if (readOnly) { state.showHidden = false; $('#show-hidden').checked = false; }
     for (const button of $$('button[data-action]')) {
       if (['new-folder','new-file','upload'].includes(button.dataset.action)) button.disabled = readOnly;
       if (button.dataset.action === 'trash-open') button.disabled = !state.capabilities.trash;
@@ -390,7 +392,7 @@
       if (action === 'chmod' && !state.capabilities.chmod) enabled = false;
       if (action === 'extract') enabled &&= !!state.capabilities.zipExtract && file?.type === 'file' && file?.extension === 'zip';
       if (action === 'delete') enabled &&= !!state.capabilities.trash;
-      btn.disabled = !enabled || !!state.capabilities.readOnly;
+      btn.disabled = !enabled || (!!state.capabilities.readOnly && action !== 'download');
     }
   }
   function selectPath(path, additive = false) {
@@ -408,6 +410,7 @@
     closeMenu();
     const actions = state.capabilities.readOnly ? (file ? [
       ['open','Ouvrir',file.type==='directory'?'folder-open':'eye'],
+      ...(file.type==='file' ? [['download','Télécharger','download']] : []),
       ['properties','Propriétés','info']
     ] : [['refresh','Actualiser','refresh']]) : file ? [
       ['open','Ouvrir',file.type==='directory'?'folder-open':'eye'],
@@ -659,7 +662,7 @@
   function profileDialog() {
     const content = `<p><strong>Compte connecté :</strong> ${escapeHtml(state.username)}</p>
       <p><strong>Racine autorisée :</strong> / (racine du compte, non racine Linux)</p>
-      <p><strong>Version :</strong> 0.2.5-alpha</p>
+      <p><strong>Version :</strong> 0.2.8-alpha</p>
       <p>Cette version utilise une authentification autonome. Les profils revendeurs, le SSO et les quotas par compte sont prévus pour une version ultérieure.</p>`;
     openModal('Mon compte',content,[{text:'Fermer',run:closeModal}],{kicker:'COMPTE HÉBERGEMENT'});
   }
@@ -672,7 +675,7 @@
     closeMenu();
     const file = path ? state.items.find(f=>f.path===path) : oneSelected();
     try {
-      if (state.capabilities.readOnly && !['open','edit','properties','settings','profile','logout','refresh','trash-open'].includes(action)) {
+      if (state.capabilities.readOnly && !['open','edit','download','properties','settings','profile','logout','refresh','trash-open'].includes(action)) {
         throw Error(t('Cet accès aux fichiers d’exemple est en lecture seule.'));
       }
       if (['new-file','new-folder'].includes(action)) {

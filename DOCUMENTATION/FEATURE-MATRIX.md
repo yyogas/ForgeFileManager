@@ -117,3 +117,14 @@ Legend: `VERIFIED` (tested), `IMPLEMENTED` (code exists; not independently brows
 | ZIP extraction with CRC/type/path checks and mtime | IMPLEMENTED; ZIP-enabled CI required | `tests/archive-extraction.php`, `tests/integrity-http.sh` |
 | Multi-tenant isolation within a shared Unix UID | NOT SUPPORTED | Requires privilege separation; do not deploy |
 | Production readiness / independent adversarial security audit | NOT VERIFIED | Remains a release blocker |
+
+## Public showcase v0.2.8-alpha
+
+| Feature | Status | Verification |
+| --- | --- | --- |
+| Public demo/demo123 sign-in | IMPLEMENTED | Authenticated HTTP smoke |
+| Read-only sample tree | IMPLEMENTED | Fixed manifest and hash checks |
+| Real hosting data inaccessible | VERIFIED LOCALLY | No live root or credentials allowed |
+| File changes blocked server-side | VERIFIED LOCALLY | create/chmod/delete/upload/zip/extract/bulk 403 |
+| HTTPS production deployment | NOT DEPLOYED | Requires operator PHP-FPM/vhost setup |
+| Independent security review | PENDING | Do not claim production certification |

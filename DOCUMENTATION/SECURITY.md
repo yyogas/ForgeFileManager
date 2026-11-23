@@ -103,3 +103,19 @@ rename-no-replace operations and secure dirfd-based traversal on their own.
 A dedicated per-tenant OS identity and host security review are required.
 
 - In 0.2.7, downloads, editor reads, previews and checksums use a verified regular-file descriptor and check device/inode against the path before reading; malicious same-UID filesystem races remain a residual risk.
+
+## Public showcase (v0.2.8-alpha)
+
+- The operator must explicitly enable the read-only public showcase in a
+  **dedicated Unix identity/PHP-FPM pool**, not a production hosting pool.
+- Known `demo / demo123` credentials are accepted only in this synthetic
+  **sample-only** profile or in the isolated loopback development sandbox.
+- Never grant public known credentials access to real accounts.
+- `FFM_PUBLIC_SHOWCASE_ROOT` is initialized only by
+  `bin/prepare-public-showcase.php`; all contents are fixed and hashed.
+- Every authenticated request verifies path ownership and an allowlist of
+  filenames. Unknown files and modified content fail closed.
+- Backend POST mutations are forbidden, including upload, save, CHMOD,
+  archive extraction and deletion. The UI alone is not the security boundary.
+- A restrictive HTTP document root, TLS, network rate limiting, account
+  separation, logging and independent security review are still required.

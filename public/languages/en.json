@@ -204,5 +204,6 @@
   "Extraction ZIP indisponible.": "ZIP extraction is unavailable.",
   "Extraire « {file} » dans un nouveau dossier sans écraser les fichiers existants ? Limite de 100 Mio.": "Extract “{file}” into a new folder without overwriting existing files? 100 MiB limit.",
   "Archive extraite vers {path}": "Archive extracted to {path}",
-  "Extraire le ZIP dans un nouveau dossier": "Extract ZIP into a new folder"
+  "Extraire le ZIP dans un nouveau dossier": "Extract ZIP into a new folder",
+  "Présentation publique en lecture seule : uniquement des fichiers d’exemple.": "Public preview is read-only and contains example files only."
 }
