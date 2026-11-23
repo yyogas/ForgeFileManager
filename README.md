@@ -2,35 +2,35 @@
 
 **A modern, account-scoped PHP file manager for web hosting environments.**
 
-> **Status:** `v0.2.8-alpha` — an original, testable **UI + secure-core foundation**. Not production-ready. Not yet a replacement for cPanel File Manager. This repository has **not** imported the external `filemanager-master` distribution because `https://download.wcp360.com/?dir=filemanager-master` could not be retrieved during this development pass. An audited upstream import/migration remains pending; no upstream source code or provenance is falsely claimed.
+> **Status:** `v0.2.9-alpha` — an original, testable **UI + secure-core foundation**. Not production-ready. Not yet a replacement for cPanel File Manager. This repository has **not** imported the external `filemanager-master` distribution because `https://download.wcp360.com/?dir=filemanager-master` could not be retrieved during this development pass. An audited upstream import/migration remains pending; no upstream source code or provenance is falsely claimed.
+
+> **New public interactive profile:** `demo / demo123` can use all implemented file operations **only in a fresh, private, temporary demo workspace** when `FFM_PUBLIC_PLAYGROUND=1` is deliberately enabled. This never unlocks actual hosting files. Read [PUBLIC-PLAYGROUND.md](DOCUMENTATION/PUBLIC-PLAYGROUND.md) for deployment isolation and resource limits.
 
 Forge File Manager is designed to provide a clean, responsive file-management experience for hosting users while enforcing access through a configured hosting-account filesystem root. The current implementation uses native PHP 8.2+, framework-free JavaScript and CSS with no runtime CDN dependency.
 
-## Public access — explicitly isolated read-only showcase
+## Public access for visitors — read-only showcase
 
-To show Forge File Manager to the public, operators may **explicitly**
-enable `FFM_PUBLIC_SHOWCASE=1` on a *separate* dedicated PHP-FPM pool
-and configure `FFM_PUBLIC_SHOWCASE_ROOT` to a private directory
-containing only synthetic sample files created by
-`php bin/prepare-public-showcase.php /absolute/private/empty/directory`.
+A dedicated **public showcase** is now supported. A visitor can open the
+HTTPS URL and sign in with **`demo / demo123`**, browse predefined sample
+files, see the interface, open/read text files and download samples. All
+write actions — including upload, edit/save, CHMOD, ZIP, move and delete —
+return **HTTP 403** from the backend even if the caller forges requests.
 
-Visitors can sign in at the public HTTPS URL with **demo / demo123**.
-They can browse, search, preview and download **sample data only**.
-**No writes are authorized**: edit/save, CHMOD, upload, rename, move,
-copy, ZIP creation/extraction and deletion return HTTP 403 even when
-the caller makes a direct authenticated API request.
+This is **not automatic** and cannot access hosting data. The operator must
+set `FFM_PUBLIC_SHOWCASE=1` and `FFM_PUBLIC_SHOWCASE_ROOT` in a completely
+separate non-root PHP-FPM pool, initialize the private sample directory via
+`php bin/prepare-public-showcase.php /path/to/private/empty/directory`, and
+expose **only** `public/` over HTTPS. The profile rejects
+`FFM_USERNAME`, `FFM_PASSWORD_HASH`, `FFM_STORAGE_ROOT`, `FFM_TRASH_ROOT`
+and local test variables. A changed file or an unexpected file in the sample
+root causes the showcase to fail closed.
 
-Public showcase refuses any real `FFM_USERNAME`, `FFM_PASSWORD_HASH`,
-`FFM_STORAGE_ROOT` or `FFM_TRASH_ROOT`. The fixed sample manifest is
-verified on each request. Unexpected files or modified samples cause
-HTTP 503 instead of disclosing data. The former automatic virtual
-demo remains disabled; this separate public mode is deliberately
-opt-in and **not a real hosting account**.
+**Deployment instructions:** [DOCUMENTATION/PUBLIC-SHOWCASE.md](DOCUMENTATION/PUBLIC-SHOWCASE.md).
+A GitHub update alone will not make `test.wcp360.com` publicly usable; the
+server must be configured and updated separately.
 
-**Full setup:** [PUBLIC-SHOWCASE.md](DOCUMENTATION/PUBLIC-SHOWCASE.md).
-Updating the GitHub code does **not** deploy or configure
-`test.wcp360.com`; a dedicated non-root PHP-FPM pool and an HTTPS
-vhost exposing only `public/` are required.
+**Real file management** requires a separate private account/password and a
+dedicated hosting PHP-FPM pool, **never** the shared demo credentials.
 
 ## UI preview: product structure
 
@@ -92,16 +92,16 @@ The username in the top-right header is returned by the authenticated server ses
 
 No database, Node build system or Composer installation is required for the first alpha.
 
-## Authentication profiles: real hosting, public showcase, local test
+## Test login: credentials shown, virtual demonstration disabled
 
-The previous **automatic virtual demo has been removed**. A separately configured, read-only public showcase is now available as described above. The login screen
+The previous **automatic virtual demo has been removed**. The explicitly opted-in public showcase described above is a separate, read-only profile. The login screen
 still displays these known, **test-only** credentials:
 
 - Username: `demo`
 - Password: `demo123`
 
-On any publicly reachable server, these credentials **must not work** for
-actual hosting files. When `FFM_TEST_SANDBOX` is unset, the server requires
+On a publicly reachable **read-only showcase**, these credentials work for
+**fixed sample files only**. They **never** work for actual hosting files. When `FFM_TEST_SANDBOX` is unset, the server requires
 `FFM_USERNAME`, `FFM_PASSWORD_HASH`, and `FFM_STORAGE_ROOT` and fails closed
 (HTTP 503) if configuration is absent. The live configuration also rejects
 `demo / demo123` even if its password hash is supplied.
@@ -381,4 +381,13 @@ Run `php tests/integrity-isolation.php` and `bash tests/integrity-http.sh`, in
 addition to the existing tests. In CI, the ZIP extension is mandatory and tests
 will fail rather than silently pass when it is missing.
 
-**Verified read handles:** text editing, downloads, image previews and SHA-256 checksums now open bounded regular-file descriptors and verify inode identity against the authorized pathname before reading. This mitigates link substitution but does not make shared-UID hosting secure.
+**Read paths:** text reads, authenticated downloads, image previews and checksums open a bounded, verified regular-file handle, comparing descriptor and pathname device/inode to reject link substitution. No application-only path check defeats hostile same-UID races.
+
+## v0.2.9-alpha — Optional full-featured public interactive demo
+
+Public visitors may sign in with **`demo / demo123`** and operate a **fresh, private, temporary workspace per login** when `FFM_PUBLIC_PLAYGROUND=1` is explicitly configured in an isolated demonstration PHP-FPM pool. This does **not** enable access to real hosting files; the legacy read-only showcase remains available as a separate mode. Public credentials in the live hosting account remain forbidden.
+
+Within the private demo workspace, users can create directories/files, edit UTF-8 code, change CHMOD (subject to existing security policies), upload/download, copy/move/rename, ZIP/unZIP (with `ext-zip`), view last-modified timestamps, send to recycle bin and restore. The temporary workspace expires after 30 minutes and is cleared by the cleanup utility. Quotas and OS isolation are mandatory. 
+
+**Deployment guide:** [Public Interactive Playground](DOCUMENTATION/PUBLIC-PLAYGROUND.md).
+**Security limitation:** PHP path checks are insufficient to protect a public demo sharing the same Unix UID or filesystem with production hosting. Use a separate isolated container/service account, hard quotas, and HTTP rate limiting. Do not turn on `FFM_PUBLIC_PLAYGROUND=1` directly within a sensitive production hosting pool.

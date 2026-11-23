@@ -157,3 +157,17 @@
 - No multi-user hosting panel SSO, ACLs, recycle bin, safe ZIP extraction, recursive delete or per-account quotas.
 - Browser automation was blocked by sandbox localhost policy, not verified.
 - Security review and production isolation validation still required.
+
+## 0.2.9-alpha — 2026-11-23
+
+### Added
+- Opt-in, full-operation public interactive test profile with known `demo / demo123` credentials, strictly isolated from hosting account mode.
+- Per-login random, temporary private storage and private recycle bin; example files seeded automatically.
+- Scoped create/edit/rename/upload/download/move/copy/CHMOD/ZIP/extract/trash/restore under existing core authorization.
+- 30-minute workspace expiry and scheduled cleanup utility; capped concurrent sessions and best-effort resource budgets.
+- PHP, HTTP and two-independent-session regression coverage and deployment guide.
+
+### Security
+- No default write access for public credentials to real hosting files. Read-only showcase remains unchanged.
+- Interactive profile refuses mixed live configuration, non-private directory ownership, dangerous roots or world-writable CHMOD policies.
+- Requires separate OS/container isolation, hard quotas and reverse-proxy rate limits before public deployment. Pending security review.

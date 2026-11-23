@@ -102,20 +102,27 @@ Only ZIP (`ext-zip`) is accepted, with explicit max archive bytes, max expanded 
 rename-no-replace operations and secure dirfd-based traversal on their own.
 A dedicated per-tenant OS identity and host security review are required.
 
-- In 0.2.7, downloads, editor reads, previews and checksums use a verified regular-file descriptor and check device/inode against the path before reading; malicious same-UID filesystem races remain a residual risk.
+- 0.2.7 read hardening: authenticated download, text read, image preview and checksums validate the opened file descriptor against the path inode. These checks mitigate link substitution but cannot replace OS-level isolation.
 
-## Public showcase (v0.2.8-alpha)
+## 0.2.8 — Explicit public showcase security boundary
 
-- The operator must explicitly enable the read-only public showcase in a
-  **dedicated Unix identity/PHP-FPM pool**, not a production hosting pool.
-- Known `demo / demo123` credentials are accepted only in this synthetic
-  **sample-only** profile or in the isolated loopback development sandbox.
-- Never grant public known credentials access to real accounts.
-- `FFM_PUBLIC_SHOWCASE_ROOT` is initialized only by
-  `bin/prepare-public-showcase.php`; all contents are fixed and hashed.
-- Every authenticated request verifies path ownership and an allowlist of
-  filenames. Unknown files and modified content fail closed.
-- Backend POST mutations are forbidden, including upload, save, CHMOD,
-  archive extraction and deletion. The UI alone is not the security boundary.
-- A restrictive HTTP document root, TLS, network rate limiting, account
-  separation, logging and independent security review are still required.
+- The sample-only read-only public showcase must run as a dedicated Unix user
+  and isolated PHP-FPM pool, separate from all real hosting accounts.
+- `FFM_PUBLIC_SHOWCASE=1` requires a private, synthetic sample directory
+  created by the CLI installer, verified on every API request.
+- Known `demo / demo123` credentials cannot be used to access real hosting
+  files, and must never be enabled on a production-account file manager.
+- Public showcase writes are rejected by the HTTP handler before any file
+  operation; JavaScript disabling buttons is only a usability enhancement.
+- A public showcase is not a security boundary against malicious processes
+  running as the same Unix UID. Keep the account truly dedicated.
+- Internet-facing operation requires rate limiting, resource quotas,
+  a restrictive web document root, HTTPS and an independent security review.
+
+## 0.2.9-alpha — Interactive public playground threat boundary
+
+Publicly known `demo / demo123` credentials may authorize real file operations **only** within an explicitly enabled per-visitor temporary demo workspace. They are rejected for live hosting resources. Storage and recycle-bin roots are random and private to each session; direct HTTP serving and PHP execution of uploaded user content are prohibited.
+
+This is a high-risk untrusted-user deployment. A separate non-root service/container identity, no access to production mounts/secrets, a dedicated quota-enforced filesystem, egress and resource limits, public request/login/upload rate limiting, scheduled expiration, and independent security testing are mandatory. The PHP application enforces best-effort limits; same-UID hostile process races are not solved by this feature.
+
+See `DOCUMENTATION/PUBLIC-PLAYGROUND.md`. Do not treat this profile as permission to expose real hosting data.

@@ -16,14 +16,14 @@ jobs:
           extensions: fileinfo, zip
           coverage: none
       - name: Require ZIP support in CI (never silently skip ZIP regression)
-        run: php -r 'if (!class_exists("ZipArchive")) { fwrite(STDERR, "ext-zip is required in CI\\n"); exit(1); }'
+        run: php -r 'if (!class_exists("ZipArchive")) { fwrite(STDERR, "ext-zip is required in CI\n"); exit(1); }'
       - name: Account isolation, editor, CHMOD, timestamps and ZIP integrity
         run: php tests/integrity-isolation.php
       - name: HTTP isolation, editor, permissions and ZIP integration
         run: bash tests/integrity-http.sh
-      - name: Public showcase fixture security regression
+      - name: Public showcase fixture and isolation tests
         run: php tests/public-showcase.php
-      - name: Public showcase read-only authenticated HTTP regression
+      - name: Public showcase authenticated read-only HTTP suite
         run: bash tests/public-showcase-http.sh
       - name: PHP syntax validation
         run: find src public bin tests -name '*.php' -print0 | xargs -0 -n1 php -l
@@ -59,3 +59,7 @@ jobs:
         run: node tests/ui-structure.test.js
       - name: Archive and multi-select UI contract
         run: node tests/archive-ui.test.js
+      - name: Public interactive workspace isolation and quota checks
+        run: php tests/public-playground.php
+      - name: Public interactive workspace HTTP end-to-end checks
+        run: bash tests/public-playground-http.sh

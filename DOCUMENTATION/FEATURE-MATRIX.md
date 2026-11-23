@@ -118,13 +118,25 @@ Legend: `VERIFIED` (tested), `IMPLEMENTED` (code exists; not independently brows
 | Multi-tenant isolation within a shared Unix UID | NOT SUPPORTED | Requires privilege separation; do not deploy |
 | Production readiness / independent adversarial security audit | NOT VERIFIED | Remains a release blocker |
 
-## Public showcase v0.2.8-alpha
+## 0.2.8-alpha — Public showcase
 
-| Feature | Status | Verification |
+| Feature | Status | Notes |
 | --- | --- | --- |
-| Public demo/demo123 sign-in | IMPLEMENTED | Authenticated HTTP smoke |
-| Read-only sample tree | IMPLEMENTED | Fixed manifest and hash checks |
-| Real hosting data inaccessible | VERIFIED LOCALLY | No live root or credentials allowed |
-| File changes blocked server-side | VERIFIED LOCALLY | create/chmod/delete/upload/zip/extract/bulk 403 |
-| HTTPS production deployment | NOT DEPLOYED | Requires operator PHP-FPM/vhost setup |
-| Independent security review | PENDING | Do not claim production certification |
+| Publicly reachable login with `demo / demo123` | IMPLEMENTED | Explicit `FFM_PUBLIC_SHOWCASE=1`, requires secure deployment |
+| Read-only sample browser | TESTED LOCALLY | Allowed files only, never real hosting data |
+| Public showcase mutations denied | TESTED LOCALLY | Server-side 403 for all write actions |
+| Sample file integrity validation | TESTED LOCALLY | Fails closed on extra/altered files, links or bad owner |
+| Public HTTPS hosting on test.wcp360.com | NOT DEPLOYED | Requires manual server and PHP-FPM configuration |
+| Independent security audit | PENDING | Public rollout remains an alpha capability |
+
+## 0.2.9-alpha — Public interactive access
+
+| Capability | Status | Notes |
+| --- | --- | --- |
+| Public `demo / demo123` login | IMPLEMENTED | Only opt-in `FFM_PUBLIC_PLAYGROUND`, not real hosting |
+| Private workspace per login | IMPLEMENTED | Random 128-bit directory identifier, server-side PHP session |
+| Full scoped file operations | IMPLEMENTED | Edit, CHMOD, uploads, compression, extraction, copying, moving, trash, restore |
+| Per-workspace resource budgets | PARTIAL | 10 MiB / 250 entries / 1 MiB upload; app checks are not OS quotas |
+| Expiry/pruning | IMPLEMENTED | 30 minutes; scheduled CLI cleanup required |
+| Independent OS/container isolation | DEPLOYMENT REQUIREMENT | Cannot be proven by source code or GitHub CI alone |
+| Public browser security/load review | PENDING | No independent penetration test, browser load test, or production validation |

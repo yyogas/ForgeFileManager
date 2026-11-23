@@ -662,7 +662,7 @@
   function profileDialog() {
     const content = `<p><strong>Compte connecté :</strong> ${escapeHtml(state.username)}</p>
       <p><strong>Racine autorisée :</strong> / (racine du compte, non racine Linux)</p>
-      <p><strong>Version :</strong> 0.2.8-alpha</p>
+      <p><strong>Version :</strong> 0.2.9-alpha</p>
       <p>Cette version utilise une authentification autonome. Les profils revendeurs, le SSO et les quotas par compte sont prévus pour une version ultérieure.</p>`;
     openModal('Mon compte',content,[{text:'Fermer',run:closeModal}],{kicker:'COMPTE HÉBERGEMENT'});
   }

@@ -52,11 +52,11 @@ final class IsolationGuard
     }
 
     /** Changes to any account-scoping or credential setting invalidate old sessions. */
-    public static function binding(string $username, string $storageRoot, string $hash, bool $sandbox, bool $showcase = false): string
+    public static function binding(string $username, string $storageRoot, string $hash, bool $sandbox, bool $showcase = false, bool $playground = false): string
     {
         return hash('sha256', implode("\0", [
             $username, (string) realpath($storageRoot), $hash,
-            $showcase ? 'public-showcase' : ($sandbox ? 'sandbox' : 'live'),
+            $playground ? 'public-playground' : ($showcase ? 'public-showcase' : ($sandbox ? 'sandbox' : 'live')),
             function_exists('posix_geteuid') ? (string) posix_geteuid() : 'unknown',
         ]));
     }

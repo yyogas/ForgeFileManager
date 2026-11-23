@@ -56,21 +56,22 @@ final class Http
             }
             $sandbox = DeploymentMode::sandboxEnabled();
             $showcase = PublicShowcase::enabled();
-            if ($sandbox && $showcase) {
-                throw new FileError('Local test sandbox and public showcase cannot be combined.', 503);
+            $playground = PublicPlayground::enabled();
+            if (($sandbox ? 1 : 0) + ($showcase ? 1 : 0) + ($playground ? 1 : 0) > 1) {
+                throw new FileError('Public playground, public showcase and test sandbox cannot be combined.', 503);
             }
-            $username = ($sandbox || $showcase) ? 'demo' : (string) getenv('FFM_USERNAME');
-            $hash = ($sandbox || $showcase) ? '' : (string) getenv('FFM_PASSWORD_HASH');
-            $storageRoot = $showcase ? PublicShowcase::root() : ($sandbox ? DeploymentMode::sandboxRoot() : (string) getenv('FFM_STORAGE_ROOT'));
-            if (!$sandbox && !$showcase && ($username === '' || $hash === '' || $storageRoot === '' || !is_dir($storageRoot))) {
+            $username = ($sandbox || $showcase || $playground) ? 'demo' : (string) getenv('FFM_USERNAME');
+            $hash = ($sandbox || $showcase || $playground) ? '' : (string) getenv('FFM_PASSWORD_HASH');
+            $storageRoot = $playground ? PublicPlayground::base() : ($showcase ? PublicShowcase::root() : ($sandbox ? DeploymentMode::sandboxRoot() : (string) getenv('FFM_STORAGE_ROOT')));
+            if (!$sandbox && !$showcase && !$playground && ($username === '' || $hash === '' || $storageRoot === '' || !is_dir($storageRoot))) {
                 throw new FileError('Forge File Manager is not configured. Set FFM_USERNAME, FFM_PASSWORD_HASH and FFM_STORAGE_ROOT.', 503);
             }
-            if (!$sandbox && !$showcase && $username === 'demo' && password_verify('demo123', $hash)) {
+            if (!$sandbox && !$showcase && !$playground && $username === 'demo' && password_verify('demo123', $hash)) {
                 throw new FileError('Public demo/demo123 credentials cannot access hosting files.', 503);
             }
-            IsolationGuard::assertAccount($storageRoot, $sandbox || $showcase);
-            $accountBinding = IsolationGuard::binding($username, $storageRoot, $hash, $sandbox, $showcase);
-            $sessionMode = $showcase ? 'public-showcase' : ($sandbox ? 'sandbox' : 'live');
+            IsolationGuard::assertAccount($storageRoot, $sandbox || $showcase || $playground);
+            $accountBinding = IsolationGuard::binding($username, $storageRoot, $hash, $sandbox, $showcase, $playground);
+            $sessionMode = $playground ? 'public-playground' : ($showcase ? 'public-showcase' : ($sandbox ? 'sandbox' : 'live'));
             $action = (string) ($_GET['action'] ?? 'me');
             $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
             if ($action === 'login' && $method === 'POST') {
@@ -82,10 +83,16 @@ final class Http
                 }
                 if (!is_string($body['username'] ?? null) || !is_string($body['password'] ?? null) ||
                     !hash_equals($username, $body['username']) ||
-                    !(($sandbox || $showcase) ? hash_equals('demo123', $body['password']) : password_verify($body['password'], $hash))) {
+                    !(($sandbox || $showcase || $playground) ? hash_equals('demo123', $body['password']) : password_verify($body['password'], $hash))) {
                     $_SESSION['failed_login_count'] = $failures + 1;
                     $_SESSION['failed_login_at'] = time();
                     throw new FileError('Invalid credentials.', 401);
+                }
+                $playgroundWorkspace = null;
+                if ($playground) {
+                    // Unknown public credentials never receive a hosting root.
+                    // A fresh private workspace is allocated for each login.
+                    $playgroundWorkspace = PublicPlayground::createWorkspace($storageRoot);
                 }
                 session_regenerate_id(true);
                 $_SESSION = [
@@ -94,6 +101,7 @@ final class Http
                     'account_binding' => $accountBinding,
                     'csrf' => bin2hex(random_bytes(32)),
                     'authenticated_at' => time(),
+                    'public_workspace_id' => $playgroundWorkspace['id'] ?? null,
                 ];
                 self::json(['ok' => true, 'username' => $username, 'csrf' => $_SESSION['csrf']]);
             }
@@ -103,7 +111,7 @@ final class Http
                 !isset($_SESSION['authenticated_at'])) {
                 throw new FileError('Authentication required.', 401);
             }
-            if (time() - (int) $_SESSION['authenticated_at'] > 43200) {
+            if (time() - (int) $_SESSION['authenticated_at'] > ($playground ? PublicPlayground::IDLE_SECONDS : 43200)) {
                 $_SESSION = [];
                 session_regenerate_id(true);
                 throw new FileError('Session expired.', 401);
@@ -114,16 +122,22 @@ final class Http
                     throw new FileError('Invalid CSRF token.', 403);
                 }
             }
+            $playgroundTrash = null;
+            if ($playground) {
+                $paths = PublicPlayground::paths($storageRoot, $_SESSION['public_workspace_id'] ?? null);
+                $storageRoot = $paths['storage'];
+                $playgroundTrash = $paths['trash'];
+            }
             $fs = new Filesystem(
                 $storageRoot,
-                (int) (getenv('FFM_EDITOR_MAX_BYTES') ?: 1048576),
-                (int) (getenv('FFM_MAX_ENTRIES') ?: 2000),
-                (int) (getenv('FFM_UPLOAD_MAX_BYTES') ?: 104857600),
-                (int) (getenv('FFM_LIST_SCAN_LIMIT') ?: 50000)
+                $playground ? min(524288, (int) (getenv('FFM_EDITOR_MAX_BYTES') ?: 1048576)) : (int) (getenv('FFM_EDITOR_MAX_BYTES') ?: 1048576),
+                $playground ? 250 : (int) (getenv('FFM_MAX_ENTRIES') ?: 2000),
+                $playground ? PublicPlayground::MAX_UPLOAD_BYTES : (int) (getenv('FFM_UPLOAD_MAX_BYTES') ?: 104857600),
+                $playground ? 250 : (int) (getenv('FFM_LIST_SCAN_LIMIT') ?: 50000)
             );
             // A private recycle bin must be explicitly configured; absent this
             // capability, HTTP deletes fail closed and never become permanent.
-            $trashSetting = $showcase ? '' : (string) getenv($sandbox ? 'FFM_TEST_TRASH_ROOT' : 'FFM_TRASH_ROOT');
+            $trashSetting = $playground ? $playgroundTrash : ($showcase ? '' : (string) getenv($sandbox ? 'FFM_TEST_TRASH_ROOT' : 'FFM_TRASH_ROOT'));
             $trash = $trashSetting === '' ? null : new Trash($fs->root(), $trashSetting);
             if ($method === 'GET' && $action === 'trash-list') {
                 if ($trash === null) throw new FileError('Private recycle bin is not configured.', 503);
@@ -135,8 +149,8 @@ final class Http
             }
             if ($method === 'GET') {
                 if ($action === 'me') {
-                    self::json(['ok' => true, 'username' => $username, 'csrf' => $_SESSION['csrf'], 'version' => '0.2.8-alpha', 'capabilities' => [
-                        'readOnly' => $showcase, 'publicShowcase' => $showcase,
+                    self::json(['ok' => true, 'username' => $username, 'csrf' => $_SESSION['csrf'], 'version' => '0.2.9-alpha', 'capabilities' => [
+                        'readOnly' => $showcase, 'publicShowcase' => $showcase, 'publicPlayground' => $playground, 'ephemeral' => $playground,
                         'chmod' => !$showcase, 'upload' => !$showcase, 'zip' => !$showcase && class_exists(\ZipArchive::class),
                         'zipExtract' => !$showcase && class_exists(\ZipArchive::class), 'bulkTransfer' => !$showcase, 'trash' => $trash !== null, 'testSandbox' => $sandbox, 'copyDirectories' => !$showcase, 'checksum' => true,
                         'maxUploadBytes' => $showcase ? 0 : $fs->maxUploadBytes(),
@@ -147,7 +161,10 @@ final class Http
                     if ($showcase) PublicShowcase::assertAllowedPath($path);
                     $params = self::listParameters();
                     if ($showcase) $params[3] = false; // Never enumerate hidden showcase manifest.
-                    self::json(['ok' => true, 'data' => $fs->listing($path, ...$params)]);
+                    $listing = $fs->listing($path, ...$params);
+                    // Do not expose underlying host capacity to public visitors.
+                    if ($playground) $listing['disk'] = ['free'=>null,'total'=>null,'isAccountQuota'=>false];
+                    self::json(['ok' => true, 'data' => $listing]);
                 }
                 if ($action === 'checksum') {
                     if ($showcase) PublicShowcase::assertAllowedPath(self::getString('path'));
@@ -214,12 +231,18 @@ final class Http
                 throw new FileError('Public showcase is read-only; changes are forbidden.', 403);
             }
             if ($action === 'upload') {
+                if ($playground) {
+                    PublicPlayground::preflight($fs, (string) $playgroundTrash, 'upload', ['size'=>(int) ($_FILES['file']['size'] ?? 0)]);
+                }
                 if (!isset($_FILES['file']) || !is_array($_FILES['file'])) {
                     throw new FileError('Upload file is required.', 400);
                 }
-                self::json(['ok' => true, 'data' => $fs->upload((string) ($_POST['path'] ?? ''), $_FILES['file'])]);
+                $uploadResult = $fs->upload((string) ($_POST['path'] ?? ''), $_FILES['file']);
+                if ($playground) PublicPlayground::assertBudget($fs->root(), (string) $playgroundTrash);
+                self::json(['ok' => true, 'data' => $uploadResult]);
             }
             $body = self::body();
+            if ($playground) PublicPlayground::preflight($fs, (string) $playgroundTrash, $action, $body);
             $str = static fn(string $field): string => is_string($body[$field] ?? null) ? $body[$field] : throw new FileError('Missing or invalid field: ' . $field, 400);
             $data = match ($action) {
                 'create' => $fs->create($str('path'), $str('name'), $str('kind')),
@@ -235,6 +258,7 @@ final class Http
                 'bulk-transfer' => BulkTransfer::execute($fs, $body['paths'] ?? null, $str('directory'), $str('mode')),
                 default => throw new FileError('Unknown operation.', 404),
             };
+            if ($playground) PublicPlayground::assertBudget($fs->root(), (string) $playgroundTrash);
             self::json(['ok' => true, 'data' => $data]);
         } catch (FileError $e) {
             self::json(['ok' => false, 'error' => $e->getMessage()], $e->getCode() ?: 400);
