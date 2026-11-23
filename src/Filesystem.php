@@ -341,9 +341,9 @@ final class Filesystem
     }
 
     /** Copy only inspected regular files and directories into a private staging directory. */
-    private function copyTree(string $source, string $dest, int $depth = 0): void
+    private function copyTree(string $source, string $dest, array &$budget, int $depth = 0): void
     {
-        if ($depth > 20 || is_link($source)) {
+        if ($depth > 20 || ++$budget['entries'] > min(2000, $this->maxEntries) || is_link($source)) {
             throw new FileError('Unsafe folder entry encountered during copy.', 403);
         }
         if (is_dir($source)) {
@@ -352,7 +352,7 @@ final class Filesystem
             }
             foreach (new DirectoryIterator($source) as $item) {
                 if (!$item->isDot()) {
-                    $this->copyTree($item->getPathname(), $dest . '/' . $item->getFilename(), $depth + 1);
+                    $this->copyTree($item->getPathname(), $dest . '/' . $item->getFilename(), $budget, $depth + 1);
                 }
             }
             @chmod($dest, (fileperms($source) & 0755) ?: 0700);
@@ -360,6 +360,10 @@ final class Filesystem
         }
         if (!is_file($source) || !is_readable($source)) {
             throw new FileError('Unsafe or unreadable file encountered during copy.', 403);
+        }
+        $size = filesize($source);
+        if ($size === false || ($budget['bytes'] += $size) > 100 * 1024 * 1024) {
+            throw new FileError('Copy exceeds the 100 MB content limit.', 413);
         }
         $from = @fopen($source, 'rb');
         $to = @fopen($dest, 'xb');
@@ -369,8 +373,7 @@ final class Filesystem
             throw new FileError('Could not copy a source file.', 500);
         }
         try {
-            $size = filesize($source);
-            if ($size === false || $size > 100 * 1024 * 1024 || stream_copy_to_stream($from, $to, $size + 1) !== $size) {
+            if (stream_copy_to_stream($from, $to, $size + 1) !== $size) {
                 throw new FileError('Source file changed or copy was interrupted.', 409);
             }
             fflush($to);
@@ -439,7 +442,8 @@ final class Filesystem
         $this->preflightCopy($source, $this->relative($relative), $budget);
         $stage = $targetDir . '/.ffm-copy-' . bin2hex(random_bytes(12));
         try {
-            $this->copyTree($source, $stage);
+            $actual = ['entries' => 0, 'bytes' => 0];
+            $this->copyTree($source, $stage, $actual);
             if (file_exists($target) || is_link($target) || !@rename($stage, $target)) {
                 throw new FileError('Copy target already exists or could not be published.', 409);
             }
