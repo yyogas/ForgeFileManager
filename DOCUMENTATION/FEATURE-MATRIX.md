@@ -24,7 +24,7 @@ Legend: `VERIFIED` (tested), `IMPLEMENTED` (code exists; not independently brows
 | CHMOD matrix | IMPLEMENTED | JS matrix, PHP backend verified |
 | World-writable CHMOD policy | VERIFIED | PHP tests |
 | ZIP archive generation | PARTIAL | Implemented, ext-zip missing in local runtime |
-| ZIP extraction | PLANNED | Disabled until security audit |
+| ZIP extraction | IMPLEMENTED — ext-zip CI validation required | Bounded staging, path/symlink/CRC checks, no overwrite; local runtime missing ext-zip |
 | Full directory copy | VERIFIED | Preflight limits and nested-symlink rejection, 21 advanced regression tests + HTTP smoke |
 | Recursive delete | BLOCKED | Intentionally disabled to prevent irreversible mass deletion |
 | Recoverable private trash / restore | VERIFIED locally | 14 direct PHP assertions, HTTP test, offline UI rendering; private configuration required |
@@ -90,3 +90,14 @@ Legend: `VERIFIED` (tested), `IMPLEMENTED` (code exists; not independently brows
 | Restore and conflict avoidance | VERIFIED locally | Tests for exact bytes and existing targets |
 | Trash modal + pagination | IMPLEMENTED | DOM/browser offline tests; real PHP browser E2E not verified |
 | Retention / purge / audit logging | PLANNED | Requires contracts and tests |
+
+## v0.2.6-alpha — archives and batch actions
+
+| Feature | Status | Evidence / limitation |
+| --- | --- | --- |
+| ZIP extraction with limits and safe staging | IMPLEMENTED | PHP security tests require ext-zip (CI); unavailable locally |
+| ZIP-slip and symlink denial | IMPLEMENTED | Archive test fixtures; requires ext-zip CI |
+| Client ZIP extraction action | IMPLEMENTED | Visible only for selected ZIP with server capability |
+| Bulk copy/move 1–25 selected items | VERIFIED locally | 13 PHP checks, HTTP security/partial-results smoke |
+| Bulk move rollback | NOT SUPPORTED | Non-atomic results explicitly reported |
+| Background operation progress and cancellation | PLANNED | Synchronous requests only |

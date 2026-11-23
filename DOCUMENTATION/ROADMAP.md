@@ -18,8 +18,8 @@
 - [x] Collision-free file/folder duplication.
 - [x] SHA-256 on-demand file integrity check (100 MiB synchronous limit).
 - [x] Per-file upload size policy (server and client).
-- [ ] ZIP extraction with bomb/path/symlink protections.
-- [ ] Bulk selection actions with bounded execution.
+- [x] Bounded ZIP extraction with bomb/path/symlink guards (requires ext-zip CI/security review).
+- [x] Multi-select copy/move with 25-item bound and honest partial results.
 - [ ] Upload quotas, type policies, malware-scan hooks.
 - [ ] Multipart chunked/resumable uploads, progress and cancel.
 
@@ -72,7 +72,7 @@ Each checkbox is an engineering work item, not a product promise. Publish only t
 
 - [x] Private recycle-bin path validation, moves and file/folder restoration.
 - [ ] Audited retention, permanent purge, quota, recovery journaling and concurrency hardening.
-- [ ] ZIP extraction with path traversal, symlink and archive-bomb defenses.
+- [x] ZIP extraction with path traversal, symlink, CRC and archive-bomb defenses (ext-zip CI required).
 - [ ] Integrate controlled multi-selection operations with atomic preflight and audit.
 - [ ] Continue accessibility audits and real staging URL end-to-end tests.
 
@@ -84,3 +84,12 @@ Each checkbox is an engineering work item, not a product promise. Publish only t
 - [ ] Design/verify durable transaction journaling, audit attribution, trash retention and quotas.
 - [ ] Optional purge with bounded recursive safety and soft-delete expiry; no destructive CLI shortcuts.
 - [ ] Independent review of concurrent OS-level filesystem mutation and controlled backup/restore drills.
+
+## v0.2.6 — secure archive and bounded batch operations
+
+- [x] ZIP preflight, safe extraction staging, checksum, quotas and collision-free new-folder publishing.
+- [x] Copy/move 1–25 selected items with per-item results.
+- [x] Context menu, centered header action and English/French translations.
+- [x] Unit and HTTP test suites; ZIP fixture tests executed on ext-zip CI runners.
+- [ ] Production ZIP policy hardening, malware integration, OS-level no-follow syscall adapter.
+- [ ] Job queue, progress/cancellation, transaction-like compensation strategy, complete browser E2E.

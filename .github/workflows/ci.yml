@@ -37,7 +37,15 @@ jobs:
         run: php tests/trash.php
       - name: Deployment mode unit tests
         run: php tests/deployment-mode.php
+      - name: ZIP extraction security regression suite
+        run: php tests/archive-extraction.php
+      - name: Bounded multi-selection transfers
+        run: php tests/bulk-transfer.php
+      - name: Authenticated ZIP and batch HTTP contracts
+        run: bash tests/bulk-archive-http.sh
       - name: JavaScript syntax validation
         run: node --check public/assets/app.js
       - name: User interface structure validation
         run: node tests/ui-structure.test.js
+      - name: Archive and multi-select UI contract
+        run: node tests/archive-ui.test.js

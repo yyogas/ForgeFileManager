@@ -83,7 +83,7 @@ header('Content-Security-Policy: default-src \'self\'; script-src \'self\'; styl
 </div>
 <div id="app" class="app hidden">
   <header class="topbar">
-    <div class="brand"><span class="brand-icon"><svg class="icon"><use href="#i-folder-open"/></svg></span><span class="brand-name">Forge <strong>File Manager</strong></span><span class="version-tag">0.2.5 ALPHA</span></div>
+    <div class="brand"><span class="brand-icon"><svg class="icon"><use href="#i-folder-open"/></svg></span><span class="brand-name">Forge <strong>File Manager</strong></span><span class="version-tag">0.2.6 ALPHA</span></div>
     <div class="topbar-right">
       <label class="language-choice header-language"><span class="sr-only">Langue</span><select id="header-language" aria-label="Langue"><option value="en">English</option><option value="fr">Français</option></select></label>
       <span class="topbar-label">Gestionnaire de fichiers</span>
@@ -113,7 +113,7 @@ header('Content-Security-Policy: default-src \'self\'; script-src \'self\'; styl
       <button class="tool selection-only toolbar-extra" data-action="rename" title="Renommer"><svg class="icon"><use href="#i-edit"/></svg> <span>Renommer</span></button>
       <button class="tool selection-only" data-action="chmod" title="Modifier les permissions CHMOD"><svg class="icon"><use href="#i-shield"/></svg> <span>CHMOD</span></button>
       <button class="tool selection-only toolbar-extra" data-action="zip" title="Compresser en ZIP"><svg class="icon"><use href="#i-archive"/></svg> <span>ZIP</span></button>
-      <button class="tool selection-only toolbar-extra" data-action="extract" disabled title="Extraction sécurisée prévue après audit"><svg class="icon"><use href="#i-archive"/></svg> <span>Extraire</span></button>
+      <button class="tool selection-only toolbar-extra" data-action="extract" title="Extraire le ZIP dans un nouveau dossier"><svg class="icon"><use href="#i-archive"/></svg> <span>Extraire</span></button>
       <button class="tool selection-only danger toolbar-extra" data-action="delete" title="Déplacer dans la corbeille"><svg class="icon"><use href="#i-trash"/></svg> <span>Supprimer</span></button>
       <span class="tool-divider"></span>
       <button class="tool" data-action="trash-open" title="Ouvrir la corbeille"><svg class="icon"><use href="#i-trash"/></svg><span>Corbeille</span></button>

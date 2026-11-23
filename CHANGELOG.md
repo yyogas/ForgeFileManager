@@ -1,3 +1,17 @@
+## 0.2.6-alpha — 2026-11-23
+
+### Added
+- Account-scoped ZIP extraction into a dedicated new folder with strict entry validation, symlink and ZIP-slip rejection, ratio/size/depth/entry caps, CRC verification, private staging and best-effort cleanup.
+- Multi-select copy/move (max 25 entries per request) with explicit item-by-item partial results; no destructive bulk actions.
+- ZIP extraction action in the sub-header and right-click menu; capability checks and bilingual messaging.
+- Security regression suites for archive inspection, bulk transfer and authenticated HTTP flows.
+- `DOCUMENTATION/ARCHIVES-AND-BULK.md` documenting operation contracts and limitations.
+
+### Remaining limitations
+- ZIP extraction depends on PHP ext-zip and must pass enabled CI; local environment without ext-zip skips extraction tests.
+- Directory staging and PHP rename are not fully race-free against hostile same-UID processes.
+- No asynchronous queue, cancellation, transactional batch rollback, antivirus or resource telemetry.
+
 ## 0.2.5-alpha — 2026-11-23
 
 ### Added

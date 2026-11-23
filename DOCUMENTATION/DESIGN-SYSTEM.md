@@ -63,3 +63,9 @@ The Copy action supports files and folders when `me.capabilities.copyDirectories
 - Recycle bin modal lists original paths, deletion time, restore actions and paging at 25 entries per screen.
 - Restore reports collisions, missing parent directories and server errors; no implicit overwrite or silent rename of restored files.
 - The UI retains no sidebar, has a centered toolbar, footer volume statistics and bounded server pagination.
+
+## v0.2.6 — archive extraction and multiple selected items
+
+When one valid `.zip` is selected and the server advertises `zipExtract`, the centered action sub-header enables **Extract** and the file's right-click menu includes **Extract to folder**. A confirmation explains that extraction creates a new folder, does not overwrite files, and has a 100 MiB limit. Without ZIP support, the action is disabled/absent.
+
+With 2–25 ordinary files/folders selected, the **Copy** and **Move** header actions prompt once for a destination. The backend returns item-level results; the UI reports the success and failure counts and displays individual failures. Single selection retains the existing operation. Do not present bulk moves as atomic/transactional.

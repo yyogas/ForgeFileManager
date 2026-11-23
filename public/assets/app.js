@@ -378,11 +378,17 @@
     for (const btn of $$('.selection-only')) {
       const action = btn.dataset.action;
       let enabled = count === 1 && !!file && file.type !== 'symlink';
+      if (action === 'copy' || action === 'move') {
+        enabled = count >= 1 && count <= 25 && [...state.selected].every(path => {
+          const selectedFile = state.items.find(item => item.path === path);
+          return selectedFile && selectedFile.type !== 'symlink' &&
+            (action !== 'copy' || selectedFile.type !== 'directory' || state.capabilities.copyDirectories);
+        }) && (count === 1 || !!state.capabilities.bulkTransfer);
+      }
       if (action === 'download') enabled &&= file?.type === 'file';
-      if (action === 'copy' && file?.type === 'directory') enabled &&= !!state.capabilities.copyDirectories;
       if (action === 'zip') enabled &&= !!state.capabilities.zip;
       if (action === 'chmod' && !state.capabilities.chmod) enabled = false;
-      if (action === 'extract') enabled = false;
+      if (action === 'extract') enabled &&= !!state.capabilities.zipExtract && file?.type === 'file' && file?.extension === 'zip';
       if (action === 'delete') enabled &&= !!state.capabilities.trash;
       btn.disabled = !enabled || !!state.capabilities.readOnly;
     }
@@ -410,6 +416,7 @@
       ...((file.type==='file'||state.capabilities.copyDirectories)?[['copy','Copier','copy']]:[]),
       ['move','Déplacer','move'],['chmod','Permissions CHMOD','shield'],
       ...(state.capabilities.zip?[['zip','Compresser en ZIP','archive']]:[]),
+      ...(state.capabilities.zipExtract && file.type==='file' && file.extension==='zip'?[['extract','Extraire en dossier','archive']]:[]),
       ['properties','Propriétés','info'], ...(state.capabilities.trash ? [['sep'],['delete','Mettre à la corbeille','trash']] : [])
     ] : [['new-folder','Nouveau dossier','folder'],['new-file','Nouveau fichier','plus'],['upload','Importer des fichiers','upload'],['sep'],['refresh','Actualiser','refresh']];
     const menu = $('#context-menu'); menu.replaceChildren();
@@ -701,11 +708,32 @@
         });return;
       }
       if (action==='copy'||action==='move'){
-        if(action==='copy'&&file.type==='directory'&&!state.capabilities.copyDirectories)throw Error('La copie de dossiers est indisponible.');
-        promptValue(action==='copy'?'Copier dans un dossier':'Déplacer dans un dossier','Dossier de destination relatif à home (laisser vide pour home)',state.path || '',async directory=>{
-          await api(action,{path:file.path,directory:directory==='/'? '':directory});
-          toast(action==='copy'?t('copied'):t('moved'));await refresh();
-        },'Exemples : public_html, backups ou home (pour la racine, saisir /).');return;
+        const paths = path ? [path] : [...state.selected];
+        if (!paths.length || paths.length > 25) throw Error(t('Sélectionnez entre 1 et 25 éléments.'));
+        if (action==='copy' && file?.type==='directory' && !state.capabilities.copyDirectories) throw Error('La copie de dossiers est indisponible.');
+        promptValue(action==='copy'?'Copier dans un dossier':'Déplacer dans un dossier','Dossier de destination relatif à home (saisir / pour home)',state.path || '/',async directory=>{
+          const dest = directory === '/' ? '' : directory;
+          if (paths.length === 1) {
+            await api(action,{path:paths[0],directory:dest});
+            toast(action==='copy'?t('copied'):t('moved'));
+          } else {
+            const response = await api('bulk-transfer',{paths,directory:dest,mode:action});
+            const result = response.data;
+            toast(t('{success} opération(s) réussie(s), {failed} échec(s).',{success:result.success,failed:result.failed}),result.failed>0);
+            if (result.failed) {
+              const failed = result.results.filter(item=>!item.ok).map(item=>`${item.source}: ${item.error}`).join('\n');
+              toast(failed,true);
+            }
+          }
+          await refresh();
+        },t('Exemples : public_html, backups ; pour la racine, saisir /.'));return;
+      }
+      if (action==='extract') {
+        if (!state.capabilities.zipExtract || file?.extension!=='zip' || file.type!=='file') throw Error(t('Extraction ZIP indisponible.'));
+        askConfirm(t('Extraire en dossier'),t('Extraire « {file} » dans un nouveau dossier sans écraser les fichiers existants ? Limite de 100 Mio.',{file:file.name}),async()=>{
+          const result = (await api('extract',{path:file.path,directory:state.path})).data;
+          toast(t('Archive extraite vers {path}',{path:result.path}));await refresh();
+        });return;
       }
       if (action==='zip'){
         if(!state.capabilities.zip)throw Error('Extension ZIP non disponible sur le serveur.');

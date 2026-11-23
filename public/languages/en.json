@@ -195,5 +195,14 @@
   "Les fichiers supprimés sont conservés dans un espace privé. La restauration exige que le dossier parent existe et que le nom soit libre.": "Deleted files remain in private storage. Restoring requires the original parent folder to exist and the filename to be available.",
   "Déplacer « {file} » dans la corbeille privée ? Vous pourrez restaurer ce fichier ou dossier depuis la barre d’actions.": "Move “{file}” to the private recycle bin? You can restore the file or directory from the toolbar.",
   "Identifiants réservés aux essais locaux isolés. Inactifs sur un hébergement réel.": "Credentials reserved for isolated local testing. Inactive on real hosting accounts.",
-  "Authentification obligatoire pour un compte réel. Aucun mot de passe public ne donne accès à ses fichiers.": "A real hosting account requires authentication. No public password grants access to its files."
+  "Authentification obligatoire pour un compte réel. Aucun mot de passe public ne donne accès à ses fichiers.": "A real hosting account requires authentication. No public password grants access to its files.",
+  "Sélectionnez entre 1 et 25 éléments.": "Select between 1 and 25 items.",
+  "{success} opération(s) réussie(s), {failed} échec(s).": "{success} succeeded, {failed} failed.",
+  "Dossier de destination relatif à home (saisir / pour home)": "Destination folder relative to home (enter / for home)",
+  "Exemples : public_html, backups ; pour la racine, saisir /.": "Examples: public_html, backups; for home, enter /.",
+  "Extraire en dossier": "Extract to folder",
+  "Extraction ZIP indisponible.": "ZIP extraction is unavailable.",
+  "Extraire « {file} » dans un nouveau dossier sans écraser les fichiers existants ? Limite de 100 Mio.": "Extract “{file}” into a new folder without overwriting existing files? 100 MiB limit.",
+  "Archive extraite vers {path}": "Archive extracted to {path}",
+  "Extraire le ZIP dans un nouveau dossier": "Extract ZIP into a new folder"
 }

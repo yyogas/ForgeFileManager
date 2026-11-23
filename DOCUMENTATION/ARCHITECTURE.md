@@ -1,4 +1,4 @@
-# Architecture — v0.2.5-alpha
+# Architecture — v0.2.6-alpha
 
 ## Current composition
 
@@ -22,7 +22,7 @@ The first deployment profile uses *one PHP-FPM pool per hosting account*, with `
 
 GET `?action=me`, `list&path=...`, `read&path=...`, `download&path=...`, `preview&path=...`.
 
-POST JSON: `login`, `logout`, `create`, `rename`, `chmod`, `save`, `delete`, `copy`, `move`, `zip`, `trash-restore`.
+POST JSON: `login`, `logout`, `create`, `rename`, `chmod`, `save`, `delete`, `copy`, `move`, `zip`, `extract`, `bulk-transfer`, `trash-restore`.
 
 POST multipart: `upload`, file field `file`, directory field `path`, header `X-CSRF-Token`.
 
@@ -71,3 +71,9 @@ This avoids transferring all records into the browser but is still an O(N log N)
 - Private trash location must be outside storage root/application/webroot, owner-only, same owner and device as account storage. Renames are non-copying; cross-device moves fail.
 - Restores reject missing parent directories or existing destinations. Concurrent modifications by external processes sharing the OS account remain a TOCTOU risk.
 - The private storage and data model are alpha-level, without retention, quota accounting, purge, transactional journal, or cross-node coordination.
+
+## v0.2.6 — ZIP and batch API
+
+`ArchiveExtractor` is a standalone, bounded service accepting only ZIP archives inside the account root and publishing only to fresh folders. Inspection rejects links, special files, traversal paths, unsupported compression, high expansion ratio, duplicate and structurally conflicting entries. Actual extraction is streamed and CRC-checked inside restrictive staging; cleanup is best-effort.
+
+`BulkTransfer` validates 1–25 selected account-relative paths and destination, then executes the existing per-source transfer contract; it returns success/failure for each and is explicitly **non-atomic**. No arbitrary privileged runner is introduced. See `ARCHIVES-AND-BULK.md` for request schemas.

@@ -126,9 +126,9 @@ final class Http
             }
             if ($method === 'GET') {
                 if ($action === 'me') {
-                    self::json(['ok' => true, 'username' => $username, 'csrf' => $_SESSION['csrf'], 'version' => '0.2.5-alpha', 'capabilities' => [
+                    self::json(['ok' => true, 'username' => $username, 'csrf' => $_SESSION['csrf'], 'version' => '0.2.6-alpha', 'capabilities' => [
                         'chmod' => true, 'upload' => true, 'zip' => class_exists(\ZipArchive::class),
-                        'zipExtract' => false, 'trash' => $trash !== null, 'testSandbox' => $sandbox, 'copyDirectories' => true, 'checksum' => true,
+                        'zipExtract' => class_exists(\ZipArchive::class), 'bulkTransfer' => true, 'trash' => $trash !== null, 'testSandbox' => $sandbox, 'copyDirectories' => true, 'checksum' => true,
                         'maxUploadBytes' => $fs->maxUploadBytes(),
                     ]]);
                 }
@@ -193,6 +193,8 @@ final class Http
                 'copy' => $fs->transfer($str('path'), $str('directory'), 'copy'),
                 'move' => $fs->transfer($str('path'), $str('directory'), 'move'),
                 'zip' => $fs->zip($str('path')),
+                'extract' => ArchiveExtractor::extract($fs, $str('path'), $str('directory')),
+                'bulk-transfer' => BulkTransfer::execute($fs, $body['paths'] ?? null, $str('directory'), $str('mode')),
                 default => throw new FileError('Unknown operation.', 404),
             };
             self::json(['ok' => true, 'data' => $data]);

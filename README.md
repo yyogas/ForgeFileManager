@@ -2,7 +2,7 @@
 
 **A modern, account-scoped PHP file manager for web hosting environments.**
 
-> **Status:** `v0.2.5-alpha` — an original, testable **UI + secure-core foundation**. Not production-ready. Not yet a replacement for cPanel File Manager. This repository has **not** imported the external `filemanager-master` distribution because `https://download.wcp360.com/?dir=filemanager-master` could not be retrieved during this development pass. An audited upstream import/migration remains pending; no upstream source code or provenance is falsely claimed.
+> **Status:** `v0.2.6-alpha` — an original, testable **UI + secure-core foundation**. Not production-ready. Not yet a replacement for cPanel File Manager. This repository has **not** imported the external `filemanager-master` distribution because `https://download.wcp360.com/?dir=filemanager-master` could not be retrieved during this development pass. An audited upstream import/migration remains pending; no upstream source code or provenance is falsely claimed.
 
 Forge File Manager is designed to provide a clean, responsive file-management experience for hosting users while enforcing access through a configured hosting-account filesystem root. The current implementation uses native PHP 8.2+, framework-free JavaScript and CSS with no runtime CDN dependency.
 
@@ -37,12 +37,13 @@ The username in the top-right header is returned by the authenticated server ses
 | Security | CSRF on mutations, scoped storage root, path-segment and symlink rejection, HTTPS required except explicit development setting |
 | Navigation | Full-width directory browser with breadcrumbs (no sidebar), list/grid, current-folder search, hidden-file toggle, sorting |
 | Header | Dynamic account username, profile dropdown, preferences, notifications |
-| Action toolbar | Create file/folder, multi-file upload, single-file download, copy single file, move, rename, CHMOD, ZIP if extension available, recycle bin (with private storage), restore, refresh |
+| Action toolbar | Create file/folder, multi-file upload, single-file download, copy/move up to 25 selected items, rename, CHMOD, ZIP creation and extraction if extension available, recycle bin (with private storage), restore, refresh |
 | Context menu | Right-click actions for file, folder and empty background; per-row action button for touch devices |
 | CHMOD | Interactive owner/group/other matrix, live octal and symbolic display, explicit server-side policy |
 | Editor | UTF-8 text editor with CTRL/CMD+S and optimistic SHA-256 conflict checks, 1 MB default limit |
 | Transfers | Authenticated file upload with configurable maximum (100 MiB default), attachment download; no overwrites |
-| ZIP | Archive a file or directory if `ext-zip` is present; 100 MB uncompressed directory limit, depth and item-count limits |
+| ZIP | Archive a file or directory; bounded, isolated extraction to a new folder (`ext-zip` required), CRC check, path/symlink/zip-bomb guards |
+| Multi-selection | Batch copy or move up to 25 selected files/folders per request, per-item success/failure (not atomic) |
 | Folder copy | Bounded recursive copies (max 100 MiB / 2,000 items / 20 levels), no symlinks, temporary private staging and best-effort rollback |
 | File integrity | On-demand SHA-256 checksum in the Properties dialog for readable regular files up to 100 MiB |
 | Context menu accessibility | Arrow Up / Down, Home, End navigation and menuitem semantics (browser acceptance still required) |
@@ -53,13 +54,13 @@ The username in the top-right header is returned by the authenticated server ses
 
 **Server pagination:** `GET /api.php?action=list&path=...&page=...&search=...&sort=...&hidden=...` sorts and filters the **whole directory on the server**, returns only **25 items per page**, and includes `total`, `pages`, `page`, `pageSize` and `hasNext`. Selection applies only to the current page; search and sort reset the page to 1. The jump-to-page control appears when there are more than 7 pages. The default maximum scan is **50,000 entries** (`FFM_LIST_SCAN_LIMIT`), configurable up to 200,000. Exceeding it returns HTTP 413 instead of a misleading truncated result. This is a bounded in-memory, offset-based directory scan (not an index or consistent snapshot); future cursor/indexed pagination is planned for extremely large or concurrently modified folders.
 
-**Not implemented yet:** permanent delete, retention/purge automation, safe extraction, file versioning, ACL management, advanced syntax highlighting, multi-tenant SSO, quota enforcement, background transfers, resumable chunks, external storage, search indexing, localization of remaining server errors, developer terminal, and plugin SDK. Buttons for unavailable operations are disabled or absent. The UI shows server disk usage **as server volume usage, not as an account quota**.
+**Not implemented yet:** permanent delete, retention/purge automation, file versioning, ACL management, advanced syntax highlighting, multi-tenant SSO, quota enforcement, background transfers, resumable chunks, external storage, search indexing, localization of remaining server errors, developer terminal, and plugin SDK. Buttons for unavailable operations are disabled or absent. The UI shows server disk usage **as server volume usage, not as an account quota**.
 
 ## Requirements
 
 - PHP **8.2+** (test target: 8.2, 8.3, 8.4).
 - Linux hosting environment; standard readable/writable directory controlled by the account.
-- PHP extensions: `fileinfo` for previews; `zip` optional for ZIP creation.
+- PHP extensions: `fileinfo` for previews; `zip` required for ZIP creation and extraction (capabilities disabled if missing).
 - HTTPS with a web server configured so the **only web document root is `public/`**.
 - Dedicated **non-root** hosting account PHP-FPM worker or equivalent verified OS isolation.
 
@@ -267,7 +268,7 @@ Optional offline Chromium tests `tests/browser-i18n.py` and `tests/browser-layou
 
 ## Product direction
 
-The longer-term goal is an extensible alternative to traditional hosting file managers with file recovery, secure archive extraction, per-account quotas, full ACLs, multi-tab code editor, resumable uploads, tenant-aware audit logging, plugin SDK, storage providers and ForgePanel SSO integration.
+The longer-term goal is an extensible alternative to traditional hosting file managers with file recovery, per-account quotas, full ACLs, multi-tab code editor, resumable uploads, tenant-aware audit logging, plugin SDK, storage providers and ForgePanel SSO integration.
 
 The current baseline is intentionally a **small, independently testable foundation**. No code from the unavailable `filemanager-master` package is represented as imported. See the documentation for accepted decisions, unresolved constraints, and future releases.
 
@@ -287,3 +288,12 @@ configures the web server's document root to `ForgeFileManager/public/`.
 A publicly accessible parent `/ForgeFileManager/` can expose private files
 (e.g. `.env`, docs or dependencies), even when `/public/` itself appears to work.
 Never leave real hosting data or live credentials on an unreviewed alpha deployment.
+
+## v0.2.6-alpha — secure ZIP extraction and batch transfers
+
+- ZIP files are inspected and extracted **only** into a new, collision-free directory after entry path/type/CRC/size/rate checks; no overwrites or general-purpose arbitrary archive extraction. Requires ext-zip.
+- Multi-selection Copy/Move handles **1–25 items** per synchronous request and returns item-level results; partial success is explicitly reported and not automatically rolled back.
+- Interactive ZIP extraction is available through the file context menu and action sub-header only when `me.capabilities.zipExtract` is true and the selected file has a `.zip` extension.
+- Verified locally: existing filesystem, auth, recycle-bin, pagination and batch tests. Full ZIP tests require an ext-zip-enabled CI runner; a skip in a local environment is not proof of ZIP correctness.
+
+See [archive and multi-selection contracts](DOCUMENTATION/ARCHIVES-AND-BULK.md). Never treat this alpha as production-ready without staging verification and an independent security review.

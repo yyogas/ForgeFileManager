@@ -195,5 +195,14 @@
   "Les fichiers supprimés sont conservés dans un espace privé. La restauration exige que le dossier parent existe et que le nom soit libre.": "Les fichiers supprimés sont conservés dans un espace privé. La restauration exige que le dossier parent existe et que le nom soit libre.",
   "Déplacer « {file} » dans la corbeille privée ? Vous pourrez restaurer ce fichier ou dossier depuis la barre d’actions.": "Déplacer « {file} » dans la corbeille privée ? Vous pourrez restaurer ce fichier ou dossier depuis la barre d’actions.",
   "Identifiants réservés aux essais locaux isolés. Inactifs sur un hébergement réel.": "Identifiants réservés aux essais locaux isolés. Inactifs sur un hébergement réel.",
-  "Authentification obligatoire pour un compte réel. Aucun mot de passe public ne donne accès à ses fichiers.": "Authentification obligatoire pour un compte réel. Aucun mot de passe public ne donne accès à ses fichiers."
+  "Authentification obligatoire pour un compte réel. Aucun mot de passe public ne donne accès à ses fichiers.": "Authentification obligatoire pour un compte réel. Aucun mot de passe public ne donne accès à ses fichiers.",
+  "Sélectionnez entre 1 et 25 éléments.": "Sélectionnez entre 1 et 25 éléments.",
+  "{success} opération(s) réussie(s), {failed} échec(s).": "{success} opération(s) réussie(s), {failed} échec(s).",
+  "Dossier de destination relatif à home (saisir / pour home)": "Dossier de destination relatif à home (saisir / pour home)",
+  "Exemples : public_html, backups ; pour la racine, saisir /.": "Exemples : public_html, backups ; pour la racine, saisir /.",
+  "Extraire en dossier": "Extraire en dossier",
+  "Extraction ZIP indisponible.": "Extraction ZIP indisponible.",
+  "Extraire « {file} » dans un nouveau dossier sans écraser les fichiers existants ? Limite de 100 Mio.": "Extraire « {file} » dans un nouveau dossier sans écraser les fichiers existants ? Limite de 100 Mio.",
+  "Archive extraite vers {path}": "Archive extraite vers {path}",
+  "Extraire le ZIP dans un nouveau dossier": "Extraire le ZIP dans un nouveau dossier"
 }
