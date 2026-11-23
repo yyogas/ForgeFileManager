@@ -34,3 +34,15 @@ Legend: `VERIFIED` (tested), `IMPLEMENTED` (code exists; not independently brows
 | Multiple isolated users under one PHP pool | BLOCKED | Requires OS-level isolation design |
 | External source `filemanager-master` | BLOCKED | Requested host inaccessible |
 | Browser E2E | BLOCKED | Browser network policy prevents localhost access |
+
+## v0.2.2-alpha: language and demo additions
+
+| Feature | Status | Evidence |
+| --- | --- | --- |
+| Default demo credentials `demo / demo123` with no live configuration | VERIFIED | HTTP smoke and offline UI test |
+| Virtual demo filesystem only, no live filesystem access | VERIFIED | HTTP smoke against deliberately sensitive test directory |
+| Demo writes and downloads prohibited server-side | VERIFIED | HTTP regression tests |
+| Real-mode `demo / demo123` rejected | VERIFIED | Dedicated authentication test |
+| English and French catalog delivery | VERIFIED | HTTP tests and JSON validation |
+| English default UI and language switch | VERIFIED locally | Offline Chromium UI exercise |
+| Full localization of PHP error messages | PLANNED | Server errors currently returned in English |

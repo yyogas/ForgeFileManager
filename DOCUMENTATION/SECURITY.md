@@ -48,3 +48,16 @@ No source from the inaccessible external directory has been copied. No license f
 Copying directory trees refuses symlinks, files larger than an aggregate 100 MiB, paths deeper than 20 levels, and more than 2,000 entries (or a stricter configured listing limit). An isolated staging tree is used for best-effort cleanup after errors. These checks are not race-free against an adversary with filesystem write privileges; a future lower-level OS adapter must use descriptor-relative, no-follow APIs for a stronger guarantee.
 
 SHA-256 checksum requests require normal authenticated GET access, regular readable files, and a 100 MiB limit. Uploads are bounded by `FFM_UPLOAD_MAX_BYTES` (default 100 MiB) and by PHP transport-level limits; a client-side check is informational only. No malware detection, storage quota enforcement, or per-IP brute-force protection is claimed. Production deployment still requires independent security assessment.
+
+## Virtual demonstration mode (v0.2.2-alpha)
+
+- The well-known `demo / demo123` credentials are accepted **only** for a virtual
+  read-only demonstration. They never authorize any real file access.
+- Demo is enabled automatically only if all three live credentials are absent.
+  Partial configuration fails closed. Explicit `FFM_DEMO_MODE=0` always disables demo.
+- Demo requests never create the real `Filesystem` object and cannot read,
+  download, upload, write, delete, change permissions, or enumerate real
+  files; server-side denials are mandatory regardless of UI buttons.
+- Live configuration that uses `demo / demo123` is rejected.
+- No filesystem, session, or API isolation claim substitutes for a formal
+  production deployment review. Only `public/` may be exposed via HTTP.

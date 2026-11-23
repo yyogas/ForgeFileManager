@@ -1,16 +1,30 @@
+# Changelog
+
+## 0.2.2-alpha — 2026-11-23
+
+### Added
+- Automatic `demo / demo123` read-only virtual sandbox when no live account is configured.
+- Explicit `FFM_DEMO_MODE=1` to force sample-only mode; `FFM_DEMO_MODE=0` disables fallback.
+- English and French translation catalogs, language selectors on login/header and in settings, persisted browser preference.
+- Real storage is never initialized in demo; uploads, downloads, file modifications and CHMOD are denied on the server.
+- Browser-offline bilingual UI smoke and HTTP security regression tests.
+
+### Security
+- Partially configured live credentials fail closed; weak demo/demo123 credentials are rejected for real hosting accounts.
+- `bin/hash-password.php` remains CLI-only; never use its URL as an administration endpoint.
+- Standalone production remains not security-audited and must expose only `public/`.
+
 ## 0.2.1-alpha — 2026-11-23
 
 ### Fixed
 - Resolve CSS, JS, API calls, uploads, image previews and downloads relative to the installation prefix instead of `/`.
 - Scope the PHP session cookie to its deployed URL prefix.
-- Add visible loading/failure hint and no-JavaScript fallback.
+- Add a visible loading/failure hint and a no-JavaScript explanation.
 
-### Quality and operations
+### QA / Operations
 - Add a nested-directory HTTP deployment regression test to GitHub Actions.
-- Document secure webroot configuration and subdirectory troubleshooting.
+- Document safe webroot configuration and troubleshooting for subdirectory installations.
 - Browser E2E remains blocked by the execution environment; no live-site visual confirmation.
-
-# Changelog
 
 ## 0.2.0-alpha — 2026-11-23
 

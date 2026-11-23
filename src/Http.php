@@ -49,11 +49,17 @@ final class Http
             if (function_exists('posix_geteuid') && posix_geteuid() === 0 && getenv('FFM_ALLOW_ROOT_DEV') !== '1') {
                 throw new FileError('Refusing to run the web file manager as root.', 403);
             }
-            $username = (string) getenv('FFM_USERNAME');
-            $hash = (string) getenv('FFM_PASSWORD_HASH');
-            $storageRoot = (string) getenv('FFM_STORAGE_ROOT');
-            if ($username === '' || $hash === '' || $storageRoot === '' || !is_dir($storageRoot)) {
+            // Explicitly enabled demo uses *virtual*, read-only sample files.
+            // The demo credentials never authorize access to FFM_STORAGE_ROOT.
+            $demo = DeploymentMode::demoEnabled();
+            $username = $demo ? 'demo' : (string) getenv('FFM_USERNAME');
+            $hash = $demo ? '' : (string) getenv('FFM_PASSWORD_HASH');
+            $storageRoot = $demo ? '' : (string) getenv('FFM_STORAGE_ROOT');
+            if (!$demo && ($username === '' || $hash === '' || $storageRoot === '' || !is_dir($storageRoot))) {
                 throw new FileError('Forge File Manager is not configured. Configure FFM_USERNAME, FFM_PASSWORD_HASH and FFM_STORAGE_ROOT.', 503);
+            }
+            if (!$demo && $username === 'demo' && password_verify('demo123', $hash)) {
+                throw new FileError('demo/demo123 is reserved for the virtual read-only demo and cannot access real hosting files.', 503);
             }
             $action = (string) ($_GET['action'] ?? 'me');
             $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
@@ -65,7 +71,8 @@ final class Http
                     throw new FileError('Too many attempts. Retry later.', 429);
                 }
                 if (!is_string($body['username'] ?? null) || !is_string($body['password'] ?? null) ||
-                    !hash_equals($username, $body['username']) || !password_verify($body['password'], $hash)) {
+                    !hash_equals($username, $body['username']) ||
+                    !($demo ? hash_equals('demo123', $body['password']) : password_verify($body['password'], $hash))) {
                     $_SESSION['failed_login_count'] = $failures + 1;
                     $_SESSION['failed_login_at'] = time();
                     throw new FileError('Invalid credentials.', 401);
@@ -73,12 +80,15 @@ final class Http
                 session_regenerate_id(true);
                 $_SESSION = [
                     'username' => $username,
+                    'mode' => $demo ? 'demo' : 'live',
                     'csrf' => bin2hex(random_bytes(32)),
                     'authenticated_at' => time(),
                 ];
                 self::json(['ok' => true, 'username' => $username, 'csrf' => $_SESSION['csrf']]);
             }
-            if (($_SESSION['username'] ?? '') !== $username || !isset($_SESSION['authenticated_at'])) {
+            if (($_SESSION['username'] ?? '') !== $username ||
+                ($_SESSION['mode'] ?? '') !== ($demo ? 'demo' : 'live') ||
+                !isset($_SESSION['authenticated_at'])) {
                 throw new FileError('Authentication required.', 401);
             }
             if (time() - (int) $_SESSION['authenticated_at'] > 43200) {
@@ -92,6 +102,32 @@ final class Http
                     throw new FileError('Invalid CSRF token.', 403);
                 }
             }
+            if ($demo) {
+                // No real Filesystem object is constructed in demo mode, even when
+                // an unsafe storage root is supplied in the environment.
+                if ($method === 'GET' && $action === 'me') {
+                    self::json(['ok' => true, 'username' => 'demo', 'csrf' => $_SESSION['csrf'],
+                        'version' => '0.2.2-alpha', 'demo' => true,
+                        'capabilities' => ['demo' => true, 'readOnly' => true, 'chmod' => false,
+                            'upload' => false, 'zip' => false, 'zipExtract' => false, 'trash' => false,
+                            'copyDirectories' => false, 'checksum' => true, 'maxUploadBytes' => 0]]);
+                }
+                if ($method === 'GET' && $action === 'list') {
+                    self::json(['ok' => true, 'data' => DemoFilesystem::listing(self::getString('path'))]);
+                }
+                if ($method === 'GET' && $action === 'read') {
+                    self::json(['ok' => true, 'data' => DemoFilesystem::readText(self::getString('path'))]);
+                }
+                if ($method === 'GET' && $action === 'checksum') {
+                    self::json(['ok' => true, 'data' => DemoFilesystem::checksum(self::getString('path'))]);
+                }
+                if ($method === 'POST' && $action === 'logout') {
+                    $_SESSION = [];
+                    session_regenerate_id(true);
+                    self::json(['ok' => true]);
+                }
+                throw new FileError('Demo mode is read-only; this operation is disabled.', 403);
+            }
             $fs = new Filesystem(
                 $storageRoot,
                 (int) (getenv('FFM_EDITOR_MAX_BYTES') ?: 1048576),
@@ -100,7 +136,7 @@ final class Http
             );
             if ($method === 'GET') {
                 if ($action === 'me') {
-                    self::json(['ok' => true, 'username' => $username, 'csrf' => $_SESSION['csrf'], 'version' => '0.2.1-alpha', 'capabilities' => [
+                    self::json(['ok' => true, 'username' => $username, 'csrf' => $_SESSION['csrf'], 'version' => '0.2.2-alpha', 'capabilities' => [
                         'chmod' => true, 'upload' => true, 'zip' => class_exists(\ZipArchive::class),
                         'zipExtract' => false, 'trash' => false, 'copyDirectories' => true, 'checksum' => true,
                         'maxUploadBytes' => $fs->maxUploadBytes(),

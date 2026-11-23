@@ -1,51 +1,78 @@
-# Deployment and troubleshooting — v0.2.1-alpha
+# Deployment and troubleshooting — v0.2.2-alpha
 
 ## Security requirement (not optional)
 
-Only the `public/` directory may be reachable by HTTP. Keep `src/`,
-`bin/`, `tests/`, `DOCUMENTATION/`, `.env`, hosting data, and
-dependencies outside all document roots. Use a dedicated non-root PHP-FPM
-pool per hosting account; a PHP session does not provide filesystem isolation.
+Only the `public/` directory may be reachable by HTTP. Keep `src/`, `bin/`, `tests/`,
+`DOCUMENTATION/`, `.env`, private hosting data, and any vendor dependencies outside
+all document roots. Host this alpha version on a dedicated test account; do not
+run it as `root` or in a shared PHP pool that can read other hosting accounts.
 
-**Recommended:** dedicate an HTTPS hostname with `DocumentRoot`
-pointing to the absolute `ForgeFileManager/public/` directory.
+**Recommended**: a dedicated HTTPS hostname whose `DocumentRoot` is the absolute
+path to `ForgeFileManager/public/`, with an account-scoped PHP-FPM pool.
 
-## Nested URL (staging only)
+## Nested test URL (for staging only)
 
-`https://test.example.com/ForgeFileManager/public/` now loads
-its assets and calls `api.php` under that prefix. However,
-the URL alone does not prove that files above `public/` are private.
+A URL like `https://test.example.com/ForgeFileManager/public/` works with the
+new relative asset and API routes. However, this URL is **not proof** that
+`/ForgeFileManager/src/`, `/ForgeFileManager/.env`, and other private paths
+are blocked by the web server. The simplest secure solution is to change
+the vhost to serve only `public/` under a dedicated hostname, or use a tested
+alias/deny configuration with no parent directory exposure.
 
-### Diagnostic checks
+### Fast checks
 
-1. In DevTools → Network, ensure `assets/app.css`, `assets/app.js`
-   and `api.php?action=me` load under the **same** `/public/` path.
-2. When logged out, `api.php?action=me` must return HTTP 401 JSON.
-   HTTP 503 means `FFM_USERNAME`, `FFM_PASSWORD_HASH`, or
-   `FFM_STORAGE_ROOT` is not configured for the PHP process.
-3. Verify that `/ForgeFileManager/README.md` is denied (403/404),
-   **not** HTTP 200. Apply the same deny policy to all non-public
-   paths including `.env`. A missing `.env` alone proves nothing.
-4. Over HTTPS the `FFMSESSID` cookie must use `Secure`,
-   `HttpOnly`, `SameSite=Strict`, and the installed prefix.
-5. Clear browser cache after copying the new CSS and JS.
+1. Load the page and open DevTools → Network. Ensure `assets/app.css`,
+   `assets/app.js` and `api.php?action=me` resolve under the same `/public/` prefix.
+2. When signed out, `api.php?action=me` must return HTTP 401 JSON.
+   HTTP 503 indicates missing `FFM_USERNAME`, `FFM_PASSWORD_HASH`,
+   or `FFM_STORAGE_ROOT` in the PHP-FPM process environment.
+3. Check that `https://<host>/ForgeFileManager/README.md` is not publicly
+   accessible (403/404 rather than 200). The same restriction must apply to
+   `.env` and all non-public files. A missing `.env` alone is not proof.
+4. Inspect the cookie: `FFMSESSID` should be `Secure` over HTTPS, `HttpOnly`,
+   `SameSite=Strict`, and scoped to the installed `/public/` path.
+5. Clear the browser cache for `app.js` and `app.css` after deployment.
 
-## Runtime requirements
+## Minimum runtime configuration
 
-- HTTPS; `FFM_ALLOW_HTTP_DEV=1` is local development only.
-- PHP 8.2+, required extensions and account-scoped file permissions.
-- Set the required `FFM_*` environment variables in a secure process
-  configuration; never commit secrets or expose them via the web.
-- Create the password hash via `php bin/hash-password.php`.
-- Keep storage outside of the webroot and separate hosting tenants
-  at the OS identity/PHP-FPM pool level.
+- HTTPS enabled. `FFM_ALLOW_HTTP_DEV=1` is **local development only**.
+- PHP 8.2+, extensions and permissions per repository README.
+- `FFM_USERNAME`, `FFM_PASSWORD_HASH` and `FFM_STORAGE_ROOT` supplied
+  securely to the application process by PHP-FPM/environment configuration.
+- Password hash generated using `php bin/hash-password.php`; never commit a
+  password or actual hash in Git or expose `.env` over the web.
+- Filesystem root owned by the intended hosting account and outside webroot.
+- Server logs checked for PHP errors; avoid displaying stack traces to users.
+
+## Why using a `/public/` URL can be dangerous
+
+Pointing a general-purpose web root at a directory containing the *entire*
+Git repository allows requests to reach internal files directly unless a
+correct web-server deny policy is in place. This is not fixed by relative
+asset paths. Hosting accounts must be isolated at the OS/PHP-FPM layer.
 
 ## Automated checks
 
-Run `php tests/filesystem.php`,
-`php tests/advanced-operations.php`,
-`bash tests/http-smoke.sh`,
-`bash tests/nested-installation.sh`,
-and `node --check public/assets/app.js`.
+- `php tests/filesystem.php`
+- `php tests/advanced-operations.php`
+- `bash tests/http-smoke.sh`
+- `bash tests/nested-installation.sh`
+- `node --check public/assets/app.js`
 
-Browser E2E and an independent security audit remain outstanding.
+Browser-based UI and accessibility tests are still outstanding.
+
+## Why `bin/hash-password.php` does not open as a web page
+
+The file intentionally exits unless executed by PHP CLI. Run `php bin/hash-password.php`
+through SSH. Do not grant HTTP access to `bin/`, `src/`, secrets, or storage.
+For a quick preview, an unconfigured instance automatically provides a **virtual,
+read-only** login (`demo / demo123`) without using any real hosting filesystem.
+Set `FFM_DEMO_MODE=0` to disable demo fallback in production.
+
+## Language preference
+
+English (`en`) is the default for new browsers. Français (`fr`) is selectable on
+both sign-in and the application header, and from Settings. Catalogs are
+`public/languages/en.json` and `public/languages/fr.json`. The selected
+language is stored in browser localStorage. The current release does not
+translate every backend-generated error message.

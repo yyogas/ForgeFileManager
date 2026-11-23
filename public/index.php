@@ -1,5 +1,7 @@
 <?php
 declare(strict_types=1);
+require_once dirname(__DIR__) . '/src/DeploymentMode.php';
+$demoMode = \ForgeFileManager\DeploymentMode::demoEnabled();
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: DENY');
 header('Referrer-Policy: no-referrer');
@@ -7,14 +9,14 @@ header('X-Robots-Tag: noindex, nofollow');
 header('Content-Security-Policy: default-src \'self\'; script-src \'self\'; style-src \'self\'; img-src \'self\' data:; connect-src \'self\'; object-src \'none\'; frame-ancestors \'none\'; base-uri \'none\'; form-action \'self\'');
 ?>
 <!doctype html>
-<html lang="fr">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#ffffff">
   <title>Forge File Manager</title>
-  <link rel="stylesheet" href="assets/app.css?v=0.2.1">
-  <script src="assets/app.js?v=0.2.1" defer></script>
+  <link rel="stylesheet" href="assets/app.css?v=0.2.2">
+  <script src="assets/app.js?v=0.2.2" defer></script>
 </head>
 <body>
 <svg class="svg-icons" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -67,19 +69,25 @@ header('Content-Security-Policy: default-src \'self\'; script-src \'self\'; styl
     <div class="brand brand-login"><span class="brand-icon"><svg class="icon"><use href="#i-folder-open"/></svg></span><span>Forge <strong>File Manager</strong></span></div>
     <h1>Connexion sécurisée</h1>
     <p>Accédez aux fichiers autorisés de votre compte d'hébergement.</p>
+    <label class="language-choice"><span>Langue</span><select id="login-language" aria-label="Langue"><option value="en">English</option><option value="fr">Français</option></select></label>
+    <?php if ($demoMode): ?>
+    <div class="demo-login-note"><strong>Mode démonstration — lecture seule</strong><p>Identifiants de démonstration : demo / demo123</p><small>Aucun fichier réel du serveur ne peut être consulté ou modifié.</small></div>
+    <?php endif; ?>
     <form id="login-form">
-      <label for="login-username">Identifiant</label><input id="login-username" name="username" autocomplete="username" required>
-      <label for="login-password">Mot de passe</label><input type="password" id="login-password" name="password" autocomplete="current-password" required>
+      <label for="login-username">Identifiant</label><input id="login-username" name="username" autocomplete="username" <?php if ($demoMode): ?>value="demo"<?php endif; ?> required>
+      <label for="login-password">Mot de passe</label><input type="password" id="login-password" name="password" autocomplete="current-password" <?php if ($demoMode): ?>value="demo123"<?php endif; ?> required>
       <button class="btn btn-primary btn-full" type="submit">Se connecter</button>
       <div id="login-error" class="form-error" role="alert"></div>
     </form>
-    <small>Authentification obligatoire. Aucun identifiant par défaut.</small>
+    <?php if (!$demoMode): ?><small>Authentification obligatoire. Aucun identifiant par défaut.</small><?php endif; ?>
   </div>
 </div>
 <div id="app" class="app hidden">
   <header class="topbar">
-    <div class="brand"><button class="icon-button mobile-menu" id="mobile-sidebar" aria-label="Ouvrir l'explorateur"><svg class="icon"><use href="#i-list"/></svg></button><span class="brand-icon"><svg class="icon"><use href="#i-folder-open"/></svg></span><span class="brand-name">Forge <strong>File Manager</strong></span><span class="version-tag">0.2.1 ALPHA</span></div>
+    <div class="brand"><button class="icon-button mobile-menu" id="mobile-sidebar" aria-label="Ouvrir l'explorateur"><svg class="icon"><use href="#i-list"/></svg></button><span class="brand-icon"><svg class="icon"><use href="#i-folder-open"/></svg></span><span class="brand-name">Forge <strong>File Manager</strong></span><span class="version-tag">0.2.2 ALPHA</span></div>
     <div class="topbar-right">
+      <span class="demo-mode-flag hidden" id="demo-mode-flag">Mode démonstration — lecture seule</span>
+      <label class="language-choice header-language"><span class="sr-only">Langue</span><select id="header-language" aria-label="Langue"><option value="en">English</option><option value="fr">Français</option></select></label>
       <span class="topbar-label">Gestionnaire de fichiers</span>
       <button class="icon-button" id="notifications-btn" aria-label="Notifications" title="Notifications"><svg class="icon"><use href="#i-bell"/></svg><span id="notification-dot" class="notification-dot hidden"></span></button>
       <button class="icon-button" id="settings-btn" aria-label="Paramètres" title="Paramètres"><svg class="icon"><use href="#i-settings"/></svg></button>

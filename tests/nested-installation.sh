@@ -1,28 +1,28 @@
 #!/usr/bin/env bash
-# Regression: nested URL deployments must not use root-relative assets/API URLs.
+# Regression: a file manager hosted below a URL prefix must never use domain-root assets/API URLs.
 set -Eeuo pipefail
 cd "$(dirname "$0")/.."
 work="$(mktemp -d)"
 mkdir -p "$work/docroot/ForgeFileManager" "$work/storage"
 cp -a src public "$work/docroot/ForgeFileManager/"
 port="$(python3 -c 'import socket;s=socket.socket();s.bind(("127.0.0.1",0));print(s.getsockname()[1]);s.close()')"
-hash="$(php -r 'echo password_hash("nested-secret-pass",PASSWORD_DEFAULT);')"
+hash="$(php -r 'echo password_hash("nested-secret-pass", PASSWORD_DEFAULT);')"
 FFM_USERNAME=hosting_nested FFM_PASSWORD_HASH="$hash" FFM_STORAGE_ROOT="$work/storage" FFM_ALLOW_HTTP_DEV=1 FFM_ALLOW_ROOT_DEV=1 \
     php -S "127.0.0.1:$port" -t "$work/docroot" > "$work/server.log" 2>&1 &
 pid=$!
-cleanup(){ kill "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true; rm -rf "$work"; }
+cleanup() { kill "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true; rm -rf "$work"; }
 trap cleanup EXIT
 base="http://127.0.0.1:$port/ForgeFileManager/public"
 for _ in $(seq 1 50); do curl -fsS "$base/" > "$work/index.html" && break; sleep .1; done
 [[ -s "$work/index.html" ]] || { cat "$work/server.log"; exit 1; }
-grep -q 'href="assets/app.css?v=0.2.1"' "$work/index.html"
-grep -q 'src="assets/app.js?v=0.2.1"' "$work/index.html"
-if grep -Eq '(src|href)="/(assets/|api\.php)' "$work/index.html"; then echo "Unexpected root URL"; exit 1; fi
+grep -q 'href="assets/app.css?v=0.2.2"' "$work/index.html"
+grep -q 'src="assets/app.js?v=0.2.2"' "$work/index.html"
+if grep -Eq '(src|href)="/(assets/|api\.php)' "$work/index.html"; then echo 'Unexpected domain-root URLs'; exit 1; fi
 echo 'PASS: HTML uses relative assets under a URL prefix'
-curl -fsS "$base/assets/app.css?v=0.2.1" > "$work/app.css"
-curl -fsS "$base/assets/app.js?v=0.2.1" > "$work/app.js"
+curl -fsS "$base/assets/app.css?v=0.2.2" > "$work/app.css"
+curl -fsS "$base/assets/app.js?v=0.2.2" > "$work/app.js"
 grep -q "new URL('api.php', document.baseURI)" "$work/app.js"
-if grep -q '/api.php?action' "$work/app.js"; then echo "Unexpected domain-root API URL"; exit 1; fi
+if grep -q '/api.php?action' "$work/app.js"; then echo 'Unexpected domain-root API URL'; exit 1; fi
 echo 'PASS: CSS/JS available and API routing is prefix-safe'
 status="$(curl -sS -o "$work/unauth.json" -D "$work/headers.txt" -w '%{http_code}' "$base/api.php?action=me")"
 [[ "$status" == '401' ]] || { echo "Unexpected unauthenticated HTTP $status"; exit 1; }

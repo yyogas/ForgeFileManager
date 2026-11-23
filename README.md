@@ -2,7 +2,7 @@
 
 **A modern, account-scoped PHP file manager for web hosting environments.**
 
-> **Status:** `v0.2.1-alpha` — an original, testable **UI + secure-core foundation**. Not production-ready. Not yet a replacement for cPanel File Manager. This repository has **not** imported the external `filemanager-master` distribution because `https://download.wcp360.com/?dir=filemanager-master` could not be retrieved during this development pass. An audited upstream import/migration remains pending; no upstream source code or provenance is falsely claimed.
+> **Status:** `v0.2.2-alpha` — an original, testable **UI + secure-core foundation**. Not production-ready. Not yet a replacement for cPanel File Manager. This repository has **not** imported the external `filemanager-master` distribution because `https://download.wcp360.com/?dir=filemanager-master` could not be retrieved during this development pass. An audited upstream import/migration remains pending; no upstream source code or provenance is falsely claimed.
 
 Forge File Manager is designed to provide a clean, responsive file-management experience for hosting users while enforcing access through a configured hosting-account filesystem root. The current implementation uses native PHP 8.2+, framework-free JavaScript and CSS with no runtime CDN dependency.
 
@@ -33,7 +33,7 @@ The username in the top-right header is returned by the authenticated server ses
 
 | Area | Actual implementation |
 | --- | --- |
-| Authentication | Password-hash verification, PHP session, logout, no default credentials |
+| Authentication | Password-hash verification and session for live accounts; virtual read-only demo uses `demo / demo123` when no live account is configured |
 | Security | CSRF on mutations, scoped storage root, path-segment and symlink rejection, HTTPS required except explicit development setting |
 | Navigation | Directory browser, breadcrumbs, root-folder sidebar, list/grid switch, search current directory, hidden-file toggle, sorting |
 | Header | Dynamic account username, profile dropdown, preferences, notifications |
@@ -46,10 +46,11 @@ The username in the top-right header is returned by the authenticated server ses
 | Folder copy | Bounded recursive copies (max 100 MiB / 2,000 items / 20 levels), no symlinks, temporary private staging and best-effort rollback |
 | File integrity | On-demand SHA-256 checksum in the Properties dialog for readable regular files up to 100 MiB |
 | Context menu accessibility | Arrow Up / Down, Home, End navigation and menuitem semantics (browser acceptance still required) |
-| Interface | Flat responsive design, dark/light mode, density options, notification toasts, keyboard shortcuts |
+| Interface | Flat responsive design, dark/light mode, density options, notification toasts, keyboard shortcuts; bilingual English/French UI |
+| Demo | Automatic virtual read-only sandbox when all live credentials are absent; demo cannot view or modify server files |
 | Testing | PHP filesystem tests and authenticated HTTP smoke tests |
 
-**Not implemented yet:** recursive delete, safe extraction, recycle bin, file versioning, ACL management, advanced syntax highlighting, multi-tenant SSO, quota enforcement, background transfers, resumable chunks, external storage, search indexing, fully localized UI, developer terminal, and plugin SDK. Buttons for unavailable operations are disabled or absent. The UI shows server disk usage **as server volume usage, not as an account quota**.
+**Not implemented yet:** recursive delete, safe extraction, recycle bin, file versioning, ACL management, advanced syntax highlighting, multi-tenant SSO, quota enforcement, background transfers, resumable chunks, external storage, search indexing, localization of remaining server errors, developer terminal, and plugin SDK. Buttons for unavailable operations are disabled or absent. The UI shows server disk usage **as server volume usage, not as an account quota**.
 
 ## Requirements
 
@@ -60,6 +61,30 @@ The username in the top-right header is returned by the authenticated server ses
 - Dedicated **non-root** hosting account PHP-FPM worker or equivalent verified OS isolation.
 
 No database, Node build system or Composer installation is required for the first alpha.
+
+## Quick start: view the demo (no password hashing required)
+
+If **none** of `FFM_USERNAME`, `FFM_PASSWORD_HASH` or `FFM_STORAGE_ROOT` is set,
+Forge File Manager automatically starts a **virtual, read-only demo**:
+
+- **Username:** `demo`
+- **Password:** `demo123`
+- UI language: **English** by default; switch to **Français** on the login screen or in the header/settings.
+- Demonstration files live in `src/DemoFilesystem.php` as immutable sample data.
+- **No real server files are exposed**; uploads, CHMOD, editing, deletion and downloads are forbidden in this demo.
+- Forcing the demo with `FFM_DEMO_MODE=1` ignores real hosting credentials. Set `FFM_DEMO_MODE=0` to disable the automatic demo in production.
+- Partially configured production credentials **fail closed** instead of falling back to demo.
+
+The demo is **not** an administrative account and does not grant hosting filesystem access.
+**Never configure a real account as `demo / demo123`.** That combination is rejected in live mode.
+
+The standalone demo can be tested locally with:
+
+```bash
+php -S 127.0.0.1:8080 -t public public/router.php
+```
+
+PHP must run as a non-root account, and insecure HTTP mode (`FFM_ALLOW_HTTP_DEV=1`) may only be enabled in disposable local development.
 
 ## Local development
 
@@ -82,18 +107,31 @@ php -S 127.0.0.1:8080 -t public public/router.php
 
 **Production:** configure `FFM_*` in a secure PHP-FPM pool or deployment secret store, enable TLS, remove `FFM_ALLOW_HTTP_DEV`, and run as the actual hosting account, never root. **Do not publish `src/`, `.env` or account files under the document root.** The first alpha supports one authorized account per process/pool; a reseller or shared superuser access model has not been implemented.
 
+### Generate a real account password (SSH/CLI only)
+
+`bin/hash-password.php` **does not work in a browser by design**. It is a CLI-only helper and must remain outside the HTTP document root.
+
+```bash
+cd /path/to/ForgeFileManager
+php bin/hash-password.php
+```
+
+Configure the resulting hash securely through a dedicated PHP-FPM pool / secret manager.
+Never publish a script that generates or changes real hosting credentials from an unauthenticated URL.
+
 ### Configuration
 
 | Environment variable | Required | Meaning |
 | --- | --- | --- |
-| `FFM_USERNAME` | Yes | Exact login username returned in the header |
-| `FFM_PASSWORD_HASH` | Yes | PHP `password_hash()` value; no default password |
-| `FFM_STORAGE_ROOT` | Yes | Existing, account-owned filesystem root, never `/` |
+| `FFM_USERNAME` | Live mode | Exact login username returned in the header |
+| `FFM_PASSWORD_HASH` | Live mode | PHP `password_hash()` value; no default password |
+| `FFM_STORAGE_ROOT` | Live mode | Existing, account-owned filesystem root, never `/` |
 | `FFM_EDITOR_MAX_BYTES` | No | Max editor file size, default `1048576` bytes |
 | `FFM_MAX_ENTRIES` | No | Max results per listed directory, default `2000` |
 | `FFM_UPLOAD_MAX_BYTES` | No | Max upload file size, default `104857600` bytes |
 | `FFM_ALLOW_WORLD_WRITABLE` | No | `0` by default; blocks modes granting write to others |
 | `FFM_ALLOW_HTTP_DEV` | No | Must be `0`/unset in production; only for local development |
+| `FFM_DEMO_MODE` | No | Unset: automatic virtual read-only demo only if all three live credentials are absent; `0`: never enable demo; `1`: force isolated demo |
 | `FFM_ALLOW_ROOT_DEV` | No | Must remain `0`/unset in production; root worker prohibited |
 
 See `.env.example`. This is a **reference list**, not an automatically loaded `.env` file: configure actual process environment securely.
@@ -130,11 +168,13 @@ See `.env.example`. This is a **reference list**, not an automatically loaded `.
 php tests/filesystem.php
 php tests/advanced-operations.php
 bash tests/http-smoke.sh
+bash tests/demo-i18n-smoke.sh
+php tests/deployment-mode.php
 node --check public/assets/app.js
 find src public bin tests -name '*.php' -print0 | xargs -0 -n1 php -l
 ```
 
-A browser test script is supplied as an **optional development check**; it requires Playwright, Chromium, and an environment that permits localhost browser access. Browser UI automation was blocked by the execution environment during this work and should not be represented as passed.
+The optional `tests/browser-i18n.py` runs an **offline** Chromium UI exercise with mocked API responses (no network or live server). It verified the demo sign-in screen, account header, read-only toolbar and English/French switching locally. Live-site browser E2E and accessibility review are still outstanding.
 
 ## Project layout
 
@@ -144,11 +184,14 @@ A browser test script is supplied as an **optional development check**; it requi
 │   ├── index.php             # Main UI shell and icon sprite
 │   ├── api.php               # Authenticated HTTP API entry point
 │   ├── router.php            # PHP dev router
+│   ├── languages/             # en.json / fr.json translation catalogs
 │   └── assets/
 │       ├── app.css           # Flat responsive design system
 │       └── app.js            # Explorer, context menus and dialogs
 ├── src/
 │   ├── Filesystem.php        # Account-scoped file operations
+│   ├── DemoFilesystem.php    # Virtual read-only example data
+│   ├── DeploymentMode.php    # Fail-closed deployment profile detection
 │   └── Http.php              # Authentication, CSRF and API routing
 ├── bin/
 │   └── hash-password.php     # Secure credential hash generation helper
@@ -181,13 +224,13 @@ A final distribution license is **not yet selected**. Do not assume third-party 
 
 ### Subdirectory deployment troubleshooting
 
-For a staging URL like `https://example.com/ForgeFileManager/public/`, CSS,
-JavaScript, API, uploads and downloads must be resolved relative to that
-URL prefix. Version 0.2.1-alpha fixes these routes and scopes the PHP
-session cookie to the application URL prefix.
-Read [safe deployment and troubleshooting](DOCUMENTATION/DEPLOYMENT.md).
+When an evaluation URL uses a prefix (e.g. `https://example.com/ForgeFileManager/public/`),
+asset and API URLs **must be relative to that prefix**. Version `0.2.2-alpha`
+fixes absolute `/assets/` and `/api.php` references and scopes the PHP session
+cookie to the application URL prefix. See [deployment and security requirements](DOCUMENTATION/DEPLOYMENT.md).
 
-**Important:** Expose only `public/` via the web server document root.
-If the parent repository folder is web-visible, `.env`, dependencies and
-other private files could be exposed. Never run the alpha on a root account
-or shared PHP-FPM pool with access to other users' storage.
+**Important:** The repository root must not be public. The recommended setup
+configures the web server's document root to `ForgeFileManager/public/`.
+A publicly accessible parent `/ForgeFileManager/` can expose private files
+(e.g. `.env`, docs or dependencies), even when `/public/` itself appears to work.
+Never leave real hosting data or live credentials on an unreviewed alpha deployment.

@@ -3,8 +3,8 @@
 (() => {
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
-  // Every endpoint is relative to the HTML document, not the domain root.
-  // Supports /, /index.php and /ForgeFileManager/public/ installations.
+  // Every endpoint is relative to the current HTML document, not the domain root.
+  // Supports /, /index.php and /ForgeFileManager/public/ installations alike.
   const apiBaseUrl = new URL('api.php', document.baseURI);
   const apiUrl = (action, params = {}) => {
     const url = new URL(apiBaseUrl.href);
@@ -22,24 +22,72 @@
     username: '', csrf: '', path: '', items: [], selected: new Set(), capabilities: {},
     view: saved.view === 'grid' ? 'grid' : 'list',
     showHidden: !!saved.showHidden, theme: saved.theme === 'dark' ? 'dark' : 'light',
-    dense: !!saved.dense, search: '', sort: saved.sort || 'name',
+    dense: !!saved.dense, language: ['fr','en'].includes(saved.language) ? saved.language : 'en', search: '', sort: saved.sort || 'name',
     rootFolders: [], notices: [], modalCloser: null, busy: false
   };
-  const languages = {
-    fr: {
-      selected: 'sélectionné(s)', none: 'Aucun élément correspondant',
-      created: 'Élément créé', saved: 'Fichier enregistré', changed: 'Permissions mises à jour',
-      deleted: 'Élément supprimé', renamed: 'Élément renommé', copied: 'Élément copié',
-      moved: 'Élément déplacé', zipped: 'Archive ZIP créée', uploaded: 'Fichier importé',
-      cancelled: 'Annuler', confirm: 'Confirmer'
+  // Centralized, versioned English/French catalogs under public/languages/.
+  // Source strings are French until the selected catalog is loaded.
+  let catalog = {};
+  const originalText = new WeakMap();
+  const originalAttributes = new WeakMap();
+  function t(key, vars = {}) {
+    const text = String(catalog[key] ?? key);
+    return text.replace(/\{([a-z]+)\}/g, (match, name) => Object.hasOwn(vars, name) ? String(vars[name]) : match);
+  }
+  function applyTranslations(root = document.body) {
+    // Only change UI labels, never user file names or source-code text.
+    const skip = '.open-file,.grid-file-name,#breadcrumbs,#folder-tree,.profile-name,.editor-textarea,#file-search,.modal-subtitle,#login-username,#login-password';
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    while (walker.nextNode()) {
+      const node = walker.currentNode;
+      if (node.parentElement?.closest(skip)) continue;
+      const current = node.nodeValue || '';
+      const previous = originalText.get(node);
+      const original = previous && previous.displayed === current ? previous.original : current;
+      const normalized = original.trim();
+      const translated = Object.hasOwn(catalog, normalized) ? t(normalized) : normalized;
+      const shown = normalized && translated !== normalized ? original.replace(normalized, translated) : original;
+      if (current !== shown) node.nodeValue = shown;
+      originalText.set(node, {original, displayed:shown});
     }
-  };
-  const t = (key) => languages.fr[key] || key;
+    for (const element of root.querySelectorAll('[title],[placeholder],[aria-label]')) {
+      if (element.closest(skip) && !element.matches('#file-search')) continue;
+      const old = originalAttributes.get(element) || {};
+      for (const attr of ['title','placeholder','aria-label']) {
+        const current = element.getAttribute(attr);
+        if (current === null) continue;
+        const stored = old[attr];
+        const original = stored && stored.displayed === current ? stored.original : current;
+        const displayed = t(original);
+        if (displayed !== current) element.setAttribute(attr,displayed);
+        old[attr] = {original, displayed};
+      }
+      originalAttributes.set(element, old);
+    }
+    document.documentElement.lang = state.language;
+    for (const selector of ['#login-language','#header-language','#setting-language']) {
+      const select = $(selector);
+      if(select) select.value = state.language;
+    }
+  }
+  async function changeLanguage(lang) {
+    if (!['en','fr'].includes(lang)) return;
+    const response = await fetch(new URL(`languages/${lang}.json`, document.baseURI), {cache:'no-cache'});
+    if (!response.ok) throw Error(`Language catalog unavailable: ${lang}`);
+    const messages = await response.json();
+    if (!messages || typeof messages !== 'object' || Array.isArray(messages)) throw Error('Invalid language catalog');
+    catalog = messages;
+    state.language = lang;
+    preferences();
+    applyTranslations();
+    if (!$('#app').classList.contains('hidden')) render();
+    applyTranslations();
+  }
 
   function preferences() {
     storage.set('ffm_preferences', {
       view: state.view, showHidden: state.showHidden, theme: state.theme,
-      dense: state.dense, sort: state.sort
+      dense: state.dense, sort: state.sort, language: state.language
     });
     document.documentElement.dataset.theme = state.theme;
     document.documentElement.style.setProperty('--row-height', state.dense ? '43px' : '54px');
@@ -55,7 +103,7 @@
     node.className = `toast ${error ? 'error' : ''}`;
     node.textContent = message;
     $('#toast-stack').appendChild(node);
-    state.notices.unshift({message, error, at: new Date().toLocaleTimeString('fr-FR')});
+    state.notices.unshift({message, error, at: new Date().toLocaleTimeString(state.language === 'fr' ? 'fr-FR' : 'en-GB')});
     state.notices = state.notices.slice(0, 12);
     $('#notification-dot').classList.remove('hidden');
     window.setTimeout(() => node.remove(), 5800);
@@ -93,11 +141,17 @@
     $('#app').classList.add('hidden');
     $('#login-view').classList.remove('hidden');
     closeMenu(); closeModal();
+    applyTranslations();
   }
   function showApp(payload) {
     state.username = payload.username;
     state.csrf = payload.csrf;
     state.capabilities = payload.capabilities ?? {};
+    const demo = !!state.capabilities.demo;
+    $('#demo-mode-flag').classList.toggle('hidden',!demo);
+    for (const button of $$('button[data-action]')) {
+      if (['new-folder','new-file','upload'].includes(button.dataset.action)) button.disabled = demo;
+    }
     $('#account-name').textContent = state.username;
     $('#account-name-menu').textContent = state.username;
     const initial = state.username.charAt(0).toLocaleUpperCase() || 'U';
@@ -105,6 +159,7 @@
     $('#account-avatar-menu').textContent = initial;
     $('#login-view').classList.add('hidden');
     $('#app').classList.remove('hidden');
+    applyTranslations();
   }
 
   async function init() {
@@ -125,10 +180,10 @@
     if (value === null || value === undefined) return '—';
     if (value === 0) return '0 o';
     const i = Math.min(4, Math.floor(Math.log(value) / Math.log(1024)));
-    return `${(value / 1024 ** i).toLocaleString('fr-FR',{maximumFractionDigits: i ? 1 : 0})} ${['o','Ko','Mo','Go','To'][i]}`;
+    return `${(value / 1024 ** i).toLocaleString((state.language === 'fr' ? 'fr-FR' : 'en-GB'),{maximumFractionDigits: i ? 1 : 0})} ${(state.language === 'fr' ? ['o','Ko','Mo','Go','To'] : ['B','KB','MB','GB','TB'])[i]}`;
   }
   function formattedDate(timestamp) {
-    return timestamp ? new Date(timestamp * 1000).toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'short'}) : '—';
+    return timestamp ? new Date(timestamp * 1000).toLocaleString(state.language === 'fr' ? 'fr-FR' : 'en-GB',{dateStyle:'short',timeStyle:'short'}) : '—';
   }
   function typeIcon(file) {
     if (file.type === 'directory') return ['folder', 'directory'];
@@ -139,9 +194,9 @@
     return ['file',''];
   }
   function typeLabel(file) {
-    if (file.type === 'directory') return 'Dossier';
-    if (file.type === 'symlink') return 'Lien bloqué';
-    return file.extension ? file.extension.toUpperCase() : 'Fichier';
+    if (file.type === 'directory') return t('Dossier');
+    if (file.type === 'symlink') return t('Lien bloqué');
+    return file.extension ? file.extension.toUpperCase() : t('Fichier');
   }
   function parentDir(path) { return path.split('/').slice(0,-1).join('/'); }
   function currentRows() {
@@ -152,7 +207,7 @@
       if (b.type === 'directory' && a.type !== 'directory') return 1;
       if (state.sort === 'date') return (b.modified || 0) - (a.modified || 0);
       if (state.sort === 'size') return (b.size || 0) - (a.size || 0);
-      return a.name.localeCompare(b.name, 'fr', {numeric: true}) * (state.sort === 'name-desc' ? -1 : 1);
+      return a.name.localeCompare(b.name, state.language, {numeric: true}) * (state.sort === 'name-desc' ? -1 : 1);
     });
     return rows;
   }
@@ -170,7 +225,7 @@
       render();
       updateDisk(data.disk);
       $('#status-path').textContent = '/' + state.path;
-      if (data.truncated) toast(`Affichage limité aux ${data.maxEntries} premières entrées.`, true);
+      if (data.truncated) toast(t('Affichage limité aux {count} premières entrées.',{count:data.maxEntries}), true);
       $('#sidebar').classList.remove('open');
       return data;
     } catch (error) { toast(error.message, true); throw error; }
@@ -179,7 +234,7 @@
   async function loadRootFolders() {
     try {
       const data = state.path === '' ? {items: state.items} : await get('list', {path:''});
-      state.rootFolders = data.items.filter(f=>f.type==='directory').sort((a,b)=>a.name.localeCompare(b.name,'fr'));
+      state.rootFolders = data.items.filter(f=>f.type==='directory').sort((a,b)=>a.name.localeCompare(b.name,state.language));
       renderTree();
     } catch { /* Account may have no permission to list its root. */ }
   }
@@ -209,7 +264,7 @@
   }
   function updateDisk(disk) {
     if (!disk || disk.total === null || disk.free === null || disk.total <= 0) {
-      $('#disk-numbers').textContent = 'Indisponible';
+      $('#disk-numbers').textContent = t('Indisponible');
       return;
     }
     const used = disk.total - disk.free;
@@ -223,19 +278,19 @@
       const [symbol,type] = typeIcon(file);
       const marked = state.selected.has(file.path);
       return `<tr data-path="${escapeHtml(file.path)}" class="${marked ? 'selected' : ''}" tabindex="0">
-        <td class="check-col"><input class="select-file" type="checkbox" data-path="${escapeHtml(file.path)}" aria-label="Sélectionner ${escapeHtml(file.name)}" ${marked ? 'checked' : ''}></td>
+        <td class="check-col"><input class="select-file" type="checkbox" data-path="${escapeHtml(file.path)}" aria-label="${escapeHtml(t('Sélectionner {name}',{name:file.name}))}" ${marked ? 'checked' : ''}></td>
         <td><div class="file-name-cell"><span class="file-icon ${type}">${icon(symbol)}</span><button class="open-file" data-path="${escapeHtml(file.path)}" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</button></div></td>
         <td class="file-type file-muted">${typeLabel(file)}</td>
         <td class="file-size file-muted">${prettySize(file.size)}</td>
         <td class="file-date file-muted">${formattedDate(file.modified)}</td>
         <td class="file-mode"><span class="mode-chip">${escapeHtml(file.mode)}</span></td>
-        <td class="actions-col"><button class="row-menu-btn" data-path="${escapeHtml(file.path)}" title="Autres actions" aria-label="Actions sur ${escapeHtml(file.name)}">${icon('more')}</button></td>
+        <td class="actions-col"><button class="row-menu-btn" data-path="${escapeHtml(file.path)}" title="Autres actions" aria-label="${escapeHtml(t('Actions sur {name}',{name:file.name}))}">${icon('more')}</button></td>
       </tr>`;
     }).join('');
     $('#file-grid').innerHTML = files.map(file => {
       const [symbol,type] = typeIcon(file);
       return `<div class="grid-file ${state.selected.has(file.path)?'selected':''}" data-path="${escapeHtml(file.path)}" tabindex="0">
-        <button class="row-menu-btn" data-path="${escapeHtml(file.path)}" title="Actions" aria-label="Actions sur ${escapeHtml(file.name)}">${icon('more')}</button>
+        <button class="row-menu-btn" data-path="${escapeHtml(file.path)}" title="Actions" aria-label="${escapeHtml(t('Actions sur {name}',{name:file.name}))}">${icon('more')}</button>
         <span class="file-icon ${type}">${icon(symbol)}</span><span class="grid-file-name" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</span>
         <small>${typeLabel(file)} · ${prettySize(file.size)}</small>
       </div>`;
@@ -243,14 +298,15 @@
     $('#file-table').classList.toggle('hidden', state.view !== 'list');
     $('#file-grid').classList.toggle('hidden', state.view !== 'grid');
     $('#empty-state').classList.toggle('hidden', files.length > 0);
-    $('#empty-state strong').textContent = state.search ? t('none') : 'Dossier vide';
-    $('#status-count').textContent = `${state.items.length} élément(s) · ${state.selected.size} sélectionné(s)`;
+    $('#empty-state strong').textContent = state.search ? t('none') : t('Dossier vide');
+    $('#status-count').textContent = t('{count} élément(s) · {selected} sélectionné(s)',{count:state.items.length,selected:state.selected.size});
     $('#select-all').checked = files.length > 0 && files.every(f => state.selected.has(f.path));
     $('#select-all').indeterminate = files.some(f=>state.selected.has(f.path)) && !$('#select-all').checked;
     $('#selection-info').classList.toggle('hidden',state.selected.size === 0);
     $('#selected-count').textContent = `${state.selected.size} ${t('selected')}`;
     syncActionButtons();
     renderTree();
+    applyTranslations();
   }
 
   function oneSelected() {
@@ -268,7 +324,7 @@
       if (action === 'zip') enabled &&= !!state.capabilities.zip;
       if (action === 'chmod' && !state.capabilities.chmod) enabled = false;
       if (action === 'extract') enabled = false;
-      btn.disabled = !enabled;
+      btn.disabled = !enabled || !!state.capabilities.readOnly;
     }
   }
   function selectPath(path, additive = false) {
@@ -284,7 +340,10 @@
   }
   function openContext(file, x, y) {
     closeMenu();
-    const actions = file ? [
+    const actions = state.capabilities.readOnly ? (file ? [
+      ['open','Ouvrir',file.type==='directory'?'folder-open':'eye'],
+      ['properties','Propriétés','info']
+    ] : [['refresh','Actualiser','refresh']]) : file ? [
       ['open','Ouvrir',file.type==='directory'?'folder-open':'eye'],
       ...(file.type==='file'?[['edit','Modifier le fichier','edit'],['download','Télécharger','download']]:[]),
       ['rename','Renommer','edit'],
@@ -312,6 +371,7 @@
     menu.style.left = `${Math.max(6,Math.min(x,window.innerWidth-rect.width-8))}px`;
     menu.style.top = `${Math.max(6,Math.min(y,window.innerHeight-rect.height-8))}px`;
     menu.querySelector('button')?.focus({preventScroll:true});
+    applyTranslations(menu);
   }
 
   function requestCloseModal() {
@@ -340,6 +400,7 @@
       $('#modal-actions').appendChild(btn);
     }
     $('#modal-backdrop').classList.remove('hidden');
+    applyTranslations($('#modal-backdrop'));
     $('#modal-content').querySelector('input,textarea,select')?.focus();
   }
   function promptValue(title, label, value, callback, info = '') {
@@ -405,7 +466,8 @@
     const subtitle = document.createElement('p'); subtitle.className='modal-subtitle'; subtitle.textContent = `${file.path} · UTF-8 · limite ${prettySize(data.maxBytes)}`;
     div.appendChild(subtitle);
     const editor = document.createElement('textarea'); editor.className='editor-textarea'; editor.spellcheck=false; editor.value=data.content;
-    editor.setAttribute('aria-label','Contenu du fichier'); div.appendChild(editor);
+    editor.setAttribute('aria-label',t('Contenu du fichier'));
+    editor.readOnly = !!state.capabilities.readOnly; div.appendChild(editor);
     let hash=data.hash;
     let dirty=false;
     editor.addEventListener('input',()=>dirty=editor.value!==data.content);
@@ -417,12 +479,14 @@
       if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='s'){event.preventDefault();void submit();}
     });
     const closeEditor = () => { if(dirty && !window.confirm('Les modifications non enregistrées seront perdues. Continuer ?')) return; closeModal(); };
-    openModal('Éditeur de code',div,[{text:'Fermer',run:closeEditor},{text:'Enregistrer',className:'btn-primary',run:submit}],{wide:true,kicker:'ÉDITEUR DE FICHIERS'});
+    const editorActions = [{text:t('Fermer'),run:closeEditor}];
+    if (!state.capabilities.readOnly) editorActions.push({text:t('Enregistrer'),className:'btn-primary',run:submit});
+    openModal(t('Éditeur de code'),div,editorActions,{wide:true,kicker:t('ÉDITEUR DE FICHIERS')});
     state.modalCloser = closeEditor;
   }
   function properties(file) {
     const div = document.createElement('div');
-    const table = [['Nom',file.name],['Chemin',file.path],['Type',typeLabel(file)],['Taille',prettySize(file.size)],['Date de modification',formattedDate(file.modified)],['Permissions',file.mode],['Lisible',file.readable?'Oui':'Non'],['Écriture',file.writable?'Oui':'Non']];
+    const table = [['Nom',file.name],['Chemin',file.path],['Type',typeLabel(file)],['Taille',prettySize(file.size)],['Date de modification',formattedDate(file.modified)],['Permissions',file.mode],['Lisible',file.readable?t('Oui'):t('Non')],['Écriture',file.writable?t('Oui'):t('Non')]];
     div.innerHTML = `<table class="perm-table"><tbody>${table.map(([key,val])=>`<tr><td>${escapeHtml(key)}</td><td>${escapeHtml(val)}</td></tr>`).join('')}</tbody></table>`;
     const actions=[{text:'Fermer',run:closeModal}];
     if(file.type==='file' && state.capabilities.checksum) actions.unshift({text:'Calculer SHA-256',className:'btn-primary',run:async()=>{
@@ -443,11 +507,14 @@
   }
   function settingsDialog() {
     const content = `<div class="settings-group">
+      <div class="settings-row"><span>Langue</span><select id="setting-language" aria-label="Langue"><option value="en">English</option><option value="fr">Français</option></select></div>
       <div class="settings-row"><span>Thème de l'interface</span><select id="setting-theme"><option value="light">Clair</option><option value="dark">Sombre</option></select></div>
       <div class="settings-row"><span>Affichage compact</span><input type="checkbox" id="setting-dense" aria-label="Activer l'affichage compact"></div>
       <div class="settings-row"><span>Afficher les fichiers cachés</span><input type="checkbox" id="setting-hidden" aria-label="Afficher les fichiers cachés"></div>
     </div><div class="settings-group"><p>Les préférences sont enregistrées dans ce navigateur. La configuration des permissions et quotas reste côté serveur.</p></div>`;
     openModal('Paramètres et préférences',content,[{text:'Fermer',run:closeModal}],{kicker:'PRÉFÉRENCES UTILISATEUR'});
+    $('#setting-language').value=state.language;
+    $('#setting-language').addEventListener('change',e=>void changeLanguage(e.target.value).catch(err=>toast(err.message,true)));
     $('#setting-theme').value=state.theme;
     $('#setting-dense').checked=state.dense;
     $('#setting-hidden').checked=state.showHidden;
@@ -458,7 +525,7 @@
   function profileDialog() {
     const content = `<p><strong>Compte connecté :</strong> ${escapeHtml(state.username)}</p>
       <p><strong>Racine autorisée :</strong> / (racine du compte, non racine Linux)</p>
-      <p><strong>Version :</strong> 0.2.0-alpha</p>
+      <p><strong>Version :</strong> 0.2.2-alpha</p>
       <p>Cette version utilise une authentification autonome. Les profils revendeurs, le SSO et les quotas par compte sont prévus pour une version ultérieure.</p>`;
     openModal('Mon compte',content,[{text:'Fermer',run:closeModal}],{kicker:'COMPTE HÉBERGEMENT'});
   }
@@ -471,6 +538,9 @@
     closeMenu();
     const file = path ? state.items.find(f=>f.path===path) : oneSelected();
     try {
+      if (state.capabilities.readOnly && !['open','edit','properties','settings','profile','logout','refresh'].includes(action)) {
+        throw Error(t('Cette démonstration est en lecture seule.'));
+      }
       if (['new-file','new-folder'].includes(action)) {
         const kind = action==='new-file' ? 'file' : 'directory';
         promptValue(kind==='file'?'Créer un fichier':'Créer un dossier','Nom','',async name=>{
@@ -486,7 +556,7 @@
       if (action==='open') {
         if(file.type==='directory'){await navigate(file.path);return;}
         if(file.type==='file'&&['png','jpg','jpeg','gif','webp'].includes(file.extension)){
-          openModal('Aperçu du fichier',`<p class="modal-subtitle">${escapeHtml(file.name)}</p><img style="max-width:100%;max-height:65vh;object-fit:contain" alt="Aperçu ${escapeHtml(file.name)}" src="${escapeHtml(apiUrl('preview', {path:file.path}))}">`,[{text:'Fermer',run:closeModal}],{wide:true});return;
+          openModal('Aperçu du fichier',`<p class="modal-subtitle">${escapeHtml(file.name)}</p><img style="max-width:100%;max-height:65vh;object-fit:contain" alt="${escapeHtml(t('Aperçu {name}',{name:file.name}))}" src="${escapeHtml(apiUrl('preview', {path:file.path}))}">`,[{text:'Fermer',run:closeModal}],{wide:true});return;
         }
         await editFile(file);return;
       }
@@ -511,12 +581,12 @@
       }
       if (action==='zip'){
         if(!state.capabilities.zip)throw Error('Extension ZIP non disponible sur le serveur.');
-        askConfirm('Créer une archive ZIP',`Créer ${file.name}.zip dans le même dossier ? Une limite de 100 Mo s'applique.`,async()=>{
+        askConfirm('Créer une archive ZIP',t('Créer {file}.zip dans le même dossier ? Une limite de 100 Mo s\'applique.',{file:file.name}),async()=>{
           await api('zip',{path:file.path});toast(t('zipped'));await refresh();
         });return;
       }
       if (action==='delete'){
-        askConfirm('Confirmer la suppression',`Supprimer définitivement « ${file.name} » ? Les dossiers non vides ne peuvent pas être supprimés. Cette version ne possède pas encore de corbeille.`,async()=>{
+        askConfirm('Confirmer la suppression',t('Supprimer définitivement « {file} » ? Les dossiers non vides ne peuvent pas être supprimés. Cette version ne possède pas encore de corbeille.',{file:file.name}),async()=>{
           await api('delete',{path:file.path});toast(t('deleted'));await refresh();
         },true);return;
       }
@@ -528,7 +598,7 @@
     $('#login-error').textContent='';
     const username=$('#login-username').value;
     const password=$('#login-password').value;
-    try { const response=await api('login',{username,password});showApp(response);$('#login-password').value='';await navigate('');await loadRootFolders(); }
+    try { await api('login',{username,password}); const me = await get('me');showApp(me);$('#login-password').value='';await navigate('');await loadRootFolders(); }
     catch(error){$('#login-error').textContent=error.message;}
   });
   document.addEventListener('click',e=>{
@@ -600,9 +670,10 @@
   $('#modal-close').addEventListener('click',requestCloseModal);
   $('#modal-backdrop').addEventListener('click',e=>{if(e.target.id==='modal-backdrop') requestCloseModal();});
   $('#upload-picker').addEventListener('change',async e=>{
+    if (state.capabilities.readOnly) { e.target.value = ''; return; }
     for (const file of e.target.files) {
       if (state.capabilities.maxUploadBytes && file.size > state.capabilities.maxUploadBytes) {
-        toast(`${file.name} : fichier supérieur à la limite de ${prettySize(state.capabilities.maxUploadBytes)}`,true); continue;
+        toast(t('{name} : fichier supérieur à la limite de {max}',{name:file.name,max:prettySize(state.capabilities.maxUploadBytes)}),true); continue;
       }
       const form = new FormData();form.append('path',state.path);form.append('file',file);
       try {
@@ -617,10 +688,10 @@
   ['dragenter','dragover'].forEach(name=>$('#files-container').addEventListener(name,e=>{e.preventDefault();e.dataTransfer.dropEffect='copy';}));
   $('#files-container').addEventListener('drop',async e=>{
     e.preventDefault();
-    if(!e.dataTransfer?.files?.length)return;
+    if(state.capabilities.readOnly || !e.dataTransfer?.files?.length)return;
     for(const file of e.dataTransfer.files){
       if (state.capabilities.maxUploadBytes && file.size > state.capabilities.maxUploadBytes) {
-        toast(`${file.name} : fichier supérieur à la limite de ${prettySize(state.capabilities.maxUploadBytes)}`,true);continue;
+        toast(t('{name} : fichier supérieur à la limite de {max}',{name:file.name,max:prettySize(state.capabilities.maxUploadBytes)}),true);continue;
       }
       const form=new FormData();form.append('path',state.path);form.append('file',file);
       try{
@@ -654,5 +725,8 @@
       e.preventDefault();openContext(oneSelected(),Math.round(window.innerWidth/2),Math.round(window.innerHeight/2));
     }
   });
-  void init();
+  for (const selector of ['#login-language','#header-language']) {
+    $(selector).addEventListener('change',e=>void changeLanguage(e.target.value).catch(err=>toast(err.message,true)));
+  }
+  void changeLanguage(state.language).catch(() => { document.documentElement.lang='fr'; }).then(init);
 })();

@@ -25,5 +25,9 @@ jobs:
         run: bash tests/http-smoke.sh
       - name: Nested public-path deployment smoke suite
         run: bash tests/nested-installation.sh
+      - name: Virtual demo and bilingual UI HTTP security regression
+        run: bash tests/demo-i18n-smoke.sh
+      - name: Deployment mode unit tests
+        run: php tests/deployment-mode.php
       - name: JavaScript syntax validation
         run: node --check public/assets/app.js
