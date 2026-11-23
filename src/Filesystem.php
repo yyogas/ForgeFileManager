@@ -213,6 +213,8 @@ final class Filesystem
         if (!@chmod($target, $numeric)) {
             throw new FileError('Permission change failed (check hosting user ownership).', 403);
         }
+        // PHP versions differ in how quickly cached stat data is invalidated.
+        clearstatcache(true, $target);
         return ['path' => $this->relative($relative), 'mode' => sprintf('%03o', fileperms($target) & 0777)];
     }
 
