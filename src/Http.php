@@ -146,28 +146,32 @@ final class Http
                     self::json(['ok' => true, 'data' => $fs->readText(self::getString('path'))]);
                 }
                 if ($action === 'download') {
-                    [$path, $name] = $fs->downloadPath(self::getString('path'));
+                    [$handle, $name, $size] = $fs->openFileForRead(self::getString('path'));
                     header('Content-Type: application/octet-stream');
                     header('Content-Disposition: attachment; filename="' . addcslashes($name, '"\\') . '"; filename*=UTF-8\'\'' . rawurlencode($name));
-                    header('Content-Length: ' . (string) filesize($path));
-                    $handle = fopen($path, 'rb');
-                    if ($handle === false) {
-                        throw new FileError('Download failed.', 500);
-                    }
+                    header('Content-Length: ' . (string) $size);
                     fpassthru($handle);
                     fclose($handle);
                     exit;
                 }
                 if ($action === 'preview') {
-                    [$path] = $fs->downloadPath(self::getString('path'));
-                    $mime = (new \finfo(FILEINFO_MIME_TYPE))->file($path);
-                    $types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-                    if (!in_array($mime, $types, true) || filesize($path) > 10 * 1024 * 1024) {
-                        throw new FileError('Preview is available for JPEG, PNG, GIF and WebP images up to 10 MB.', 415);
+                    [$handle, , $size] = $fs->openFileForRead(self::getString('path'));
+                    try {
+                        if ($size > 10 * 1024 * 1024) {
+                            throw new FileError('Image preview exceeds the 10 MiB limit.', 413);
+                        }
+                        $contents = stream_get_contents($handle, 10 * 1024 * 1024 + 1);
+                        $mime = $contents === false ? false : (new \finfo(FILEINFO_MIME_TYPE))->buffer($contents);
+                        $types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+                        if ($contents === false || strlen($contents) !== $size || !in_array($mime, $types, true)) {
+                            throw new FileError('Preview requires a valid JPEG, PNG, GIF or WebP under 10 MiB.', 415);
+                        }
+                    } finally {
+                        fclose($handle);
                     }
                     header('Content-Type: ' . $mime);
                     header('Content-Security-Policy: sandbox');
-                    readfile($path);
+                    echo $contents;
                     exit;
                 }
             }
