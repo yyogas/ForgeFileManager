@@ -1,0 +1,65 @@
+name: Forge File Manager CI
+on:
+  push:
+  pull_request:
+jobs:
+  php-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        php: ['8.2', '8.3', '8.4']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: fileinfo, zip
+          coverage: none
+      - name: Require ZIP support in CI (never silently skip ZIP regression)
+        run: php -r 'if (!class_exists("ZipArchive")) { fwrite(STDERR, "ext-zip is required in CI\n"); exit(1); }'
+      - name: Account isolation, editor, CHMOD, timestamps and ZIP integrity
+        run: php tests/integrity-isolation.php
+      - name: HTTP isolation, editor, permissions and ZIP integration
+        run: bash tests/integrity-http.sh
+      - name: Public showcase fixture and isolation tests
+        run: php tests/public-showcase.php
+      - name: Public showcase authenticated read-only HTTP suite
+        run: bash tests/public-showcase-http.sh
+      - name: PHP syntax validation
+        run: find src public bin tests -name '*.php' -print0 | xargs -0 -n1 php -l
+      - name: Filesystem regression suite
+        run: php tests/filesystem.php
+      - name: Advanced filesystem operations suite
+        run: php tests/advanced-operations.php
+      - name: Server pagination regression (more than 2,000 files)
+        run: php tests/server-pagination.php
+      - name: Server pagination HTTP contract
+        run: bash tests/server-pagination-http.sh
+      - name: Fail-closed deletion and disabled demo HTTP suite
+        run: bash tests/fail-closed-http.sh
+      - name: Authenticated HTTP smoke suite
+        run: bash tests/http-smoke.sh
+      - name: Nested public-path deployment smoke suite
+        run: bash tests/nested-installation.sh
+      - name: Isolated test account and bilingual UI HTTP regression
+        run: bash tests/test-sandbox-i18n-smoke.sh
+      - name: Private recycle-bin tests
+        run: php tests/trash.php
+      - name: Deployment mode unit tests
+        run: php tests/deployment-mode.php
+      - name: ZIP extraction security regression suite
+        run: php tests/archive-extraction.php
+      - name: Bounded multi-selection transfers
+        run: php tests/bulk-transfer.php
+      - name: Authenticated ZIP and batch HTTP contracts
+        run: bash tests/bulk-archive-http.sh
+      - name: JavaScript syntax validation
+        run: node --check public/assets/app.js
+      - name: User interface structure validation
+        run: node tests/ui-structure.test.js
+      - name: Archive and multi-select UI contract
+        run: node tests/archive-ui.test.js
+      - name: Public interactive workspace isolation and quota checks
+        run: php tests/public-playground.php
+      - name: Public interactive workspace HTTP end-to-end checks
+        run: bash tests/public-playground-http.sh
