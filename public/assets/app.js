@@ -303,6 +303,10 @@
     menu.querySelector('button')?.focus({preventScroll:true});
   }
 
+  function requestCloseModal() {
+    if (typeof state.modalCloser === 'function') { state.modalCloser(); return; }
+    closeModal();
+  }
   function closeModal() {
     $('#modal-backdrop').classList.add('hidden');
     $('.modal').classList.remove('wide');
@@ -403,6 +407,7 @@
     });
     const closeEditor = () => { if(dirty && !window.confirm('Les modifications non enregistrées seront perdues. Continuer ?')) return; closeModal(); };
     openModal('Éditeur de code',div,[{text:'Fermer',run:closeEditor},{text:'Enregistrer',className:'btn-primary',run:submit}],{wide:true,kicker:'ÉDITEUR DE FICHIERS'});
+    state.modalCloser = closeEditor;
   }
   function properties(file) {
     const div = document.createElement('div');
@@ -566,8 +571,8 @@
   $('#notifications-btn').addEventListener('click',notifyDialog);
   $('#sidebar-refresh').addEventListener('click',()=>void loadRootFolders());
   $('#mobile-sidebar').addEventListener('click',()=>$('#sidebar').classList.toggle('open'));
-  $('#modal-close').addEventListener('click',closeModal);
-  $('#modal-backdrop').addEventListener('click',e=>{if(e.target.id==='modal-backdrop') closeModal();});
+  $('#modal-close').addEventListener('click',requestCloseModal);
+  $('#modal-backdrop').addEventListener('click',e=>{if(e.target.id==='modal-backdrop') requestCloseModal();});
   $('#upload-picker').addEventListener('change',async e=>{
     for (const file of e.target.files) {
       const form = new FormData();form.append('path',state.path);form.append('file',file);
@@ -595,7 +600,7 @@
     await refresh();
   });
   document.addEventListener('keydown',e=>{
-    if(e.key==='Escape'){closeMenu();closeModal();$('#sidebar').classList.remove('open');return;}
+    if(e.key==='Escape'){closeMenu();requestCloseModal();$('#sidebar').classList.remove('open');return;}
     if($('#app').classList.contains('hidden'))return;
     const editing=e.target.matches('input,textarea,select,[contenteditable]');
     if(editing)return;
