@@ -1,0 +1,25 @@
+name: Forge File Manager CI
+on:
+  push:
+  pull_request:
+jobs:
+  php-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        php: ['8.2', '8.3', '8.4']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: fileinfo, zip
+          coverage: none
+      - name: PHP syntax validation
+        run: find src public bin tests -name '*.php' -print0 | xargs -0 -n1 php -l
+      - name: Filesystem regression suite
+        run: php tests/filesystem.php
+      - name: Authenticated HTTP smoke suite
+        run: bash tests/http-smoke.sh
+      - name: JavaScript syntax validation
+        run: node --check public/assets/app.js
