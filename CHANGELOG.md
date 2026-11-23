@@ -1,3 +1,23 @@
+## 0.2.7-alpha — 2026-11-23
+
+### Security and integrity hardening
+- Validate root ownership and optional account UID, reject system-wide storage roots.
+- Bind sessions to account root, password hash and effective Unix UID.
+- Reject regular hardlinks, including potential links outside the account root.
+- Harden UTF-8 file edits with locking, private staging, revision conflicts,
+  inode checks, permission preservation and modified timestamp reporting.
+- Verify CHMOD actually applied and return last modification time.
+- Create ZIPs via constrained private staging, without overwrites.
+- Restore validated file/directory timestamps during safe ZIP extraction.
+- Add PHP and HTTP regressions for isolation, editor, CHMOD, timestamps and archives.
+- Require ext-zip within GitHub CI, so ZIP tests cannot silently skip.
+
+### Known limitations
+- PHP filesystem primitives are not a complete race-safe isolation boundary.
+- No multi-tenant support under a shared PHP/Unix identity.
+- Ext-zip is absent in local sandbox; full ZIP tests require CI validation.
+- Production deployment still requires dedicated Unix user, webroot hardening and independent review.
+
 ## 0.2.6-alpha — 2026-11-23
 
 ### Added

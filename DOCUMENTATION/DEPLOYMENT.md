@@ -87,3 +87,11 @@ both sign-in and the application header, and from Settings. Catalogs are
 `public/languages/en.json` and `public/languages/fr.json`. The selected
 language is stored in browser localStorage. The current release does not
 translate every backend-generated error message.
+
+
+## 0.2.7 deployment hardening
+Use a dedicated **non-root PHP-FPM pool per hosting account** and set the account-owned `FFM_STORAGE_ROOT`.
+You can pin the actual numeric worker UID using `FFM_EXPECTED_UID`. Reject broad roots such as `/home` or `/srv`.
+Never enable `FFM_ALLOW_ROOT_DEV` or `FFM_ALLOW_HTTP_DEV` on public servers.
+Only `public/` may be HTTP-accessible. Deny HTTP requests to `.ffm-*` temporary paths in hosted sites; staging can occur within a managed website directory.
+PHP checks cannot protect two tenants sharing the same Unix UID or prevent hostile same-UID races; validate filesystem ACLs, pool identities, and effective permissions in staging.
