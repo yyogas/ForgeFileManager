@@ -46,7 +46,7 @@ final class Http
     {
         try {
             self::bootstrap();
-            if (function_exists('posix_geteuid') && posix_geteuid() === 0 && getenv('FFM_ALLOW_ROOT_DEV') !== '1') {
+            if (function_exists('posix_geteuid') && posix_geteuid() === 0 && !IsolationGuard::localDevelopment()) {
                 throw new FileError('Refusing to run the web file manager as root.', 403);
             }
             // Virtual demo is removed. The public, known demo/demo123 combination
@@ -64,6 +64,8 @@ final class Http
             if (!$sandbox && $username === 'demo' && password_verify('demo123', $hash)) {
                 throw new FileError('Public demo/demo123 credentials cannot access hosting files.', 503);
             }
+            IsolationGuard::assertAccount($storageRoot, $sandbox);
+            $accountBinding = IsolationGuard::binding($username, $storageRoot, $hash, $sandbox);
             $action = (string) ($_GET['action'] ?? 'me');
             $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
             if ($action === 'login' && $method === 'POST') {
@@ -84,6 +86,7 @@ final class Http
                 $_SESSION = [
                     'username' => $username,
                     'mode' => $sandbox ? 'sandbox' : 'live',
+                    'account_binding' => $accountBinding,
                     'csrf' => bin2hex(random_bytes(32)),
                     'authenticated_at' => time(),
                 ];
@@ -91,6 +94,7 @@ final class Http
             }
             if (($_SESSION['username'] ?? '') !== $username ||
                 ($_SESSION['mode'] ?? '') !== ($sandbox ? 'sandbox' : 'live') ||
+                !hash_equals($accountBinding, (string) ($_SESSION['account_binding'] ?? '')) ||
                 !isset($_SESSION['authenticated_at'])) {
                 throw new FileError('Authentication required.', 401);
             }
@@ -126,7 +130,7 @@ final class Http
             }
             if ($method === 'GET') {
                 if ($action === 'me') {
-                    self::json(['ok' => true, 'username' => $username, 'csrf' => $_SESSION['csrf'], 'version' => '0.2.6-alpha', 'capabilities' => [
+                    self::json(['ok' => true, 'username' => $username, 'csrf' => $_SESSION['csrf'], 'version' => '0.2.7-alpha', 'capabilities' => [
                         'chmod' => true, 'upload' => true, 'zip' => class_exists(\ZipArchive::class),
                         'zipExtract' => class_exists(\ZipArchive::class), 'bulkTransfer' => true, 'trash' => $trash !== null, 'testSandbox' => $sandbox, 'copyDirectories' => true, 'checksum' => true,
                         'maxUploadBytes' => $fs->maxUploadBytes(),

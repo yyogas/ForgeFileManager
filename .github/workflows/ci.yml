@@ -15,6 +15,12 @@ jobs:
           php-version: ${{ matrix.php }}
           extensions: fileinfo, zip
           coverage: none
+      - name: Require ZIP support in CI (never silently skip ZIP regression)
+        run: php -r 'if (!class_exists("ZipArchive")) { fwrite(STDERR, "ext-zip is required in CI\\n"); exit(1); }'
+      - name: Account isolation, editor, CHMOD, timestamps and ZIP integrity
+        run: php tests/integrity-isolation.php
+      - name: HTTP isolation, editor, permissions and ZIP integration
+        run: bash tests/integrity-http.sh
       - name: PHP syntax validation
         run: find src public bin tests -name '*.php' -print0 | xargs -0 -n1 php -l
       - name: Filesystem regression suite

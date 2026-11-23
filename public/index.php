@@ -15,8 +15,8 @@ header('Content-Security-Policy: default-src \'self\'; script-src \'self\'; styl
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#ffffff">
   <title>Forge File Manager</title>
-  <link rel="stylesheet" href="assets/app.css?v=0.2.5">
-  <script src="assets/app.js?v=0.2.5" defer></script>
+  <link rel="stylesheet" href="assets/app.css?v=0.2.7">
+  <script src="assets/app.js?v=0.2.7" defer></script>
 </head>
 <body>
 <svg class="svg-icons" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
