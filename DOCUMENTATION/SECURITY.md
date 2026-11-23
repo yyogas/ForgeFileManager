@@ -101,3 +101,5 @@ Only ZIP (`ext-zip`) is accepted, with explicit max archive bytes, max expanded 
 **Residual risk:** PHP standard filesystem functions cannot provide atomic,
 rename-no-replace operations and secure dirfd-based traversal on their own.
 A dedicated per-tenant OS identity and host security review are required.
+
+- In 0.2.7, downloads, editor reads, previews and checksums use a verified regular-file descriptor and check device/inode against the path before reading; malicious same-UID filesystem races remain a residual risk.
