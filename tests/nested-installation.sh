@@ -15,12 +15,12 @@ trap cleanup EXIT
 base="http://127.0.0.1:$port/ForgeFileManager/public"
 for _ in $(seq 1 50); do curl -fsS "$base/" > "$work/index.html" && break; sleep .1; done
 [[ -s "$work/index.html" ]] || { cat "$work/server.log"; exit 1; }
-grep -q 'href="assets/app.css?v=0.2.2"' "$work/index.html"
-grep -q 'src="assets/app.js?v=0.2.2"' "$work/index.html"
+grep -Eq 'href="assets/app\.css\?v=[0-9]+\.[0-9]+\.[0-9]+"' "$work/index.html"
+grep -Eq 'src="assets/app\.js\?v=[0-9]+\.[0-9]+\.[0-9]+"' "$work/index.html"
 if grep -Eq '(src|href)="/(assets/|api\.php)' "$work/index.html"; then echo 'Unexpected domain-root URLs'; exit 1; fi
 echo 'PASS: HTML uses relative assets under a URL prefix'
-curl -fsS "$base/assets/app.css?v=0.2.2" > "$work/app.css"
-curl -fsS "$base/assets/app.js?v=0.2.2" > "$work/app.js"
+curl -fsS "$base/assets/app.css" > "$work/app.css"
+curl -fsS "$base/assets/app.js" > "$work/app.js"
 grep -q "new URL('api.php', document.baseURI)" "$work/app.js"
 if grep -q '/api.php?action' "$work/app.js"; then echo 'Unexpected domain-root API URL'; exit 1; fi
 echo 'PASS: CSS/JS available and API routing is prefix-safe'
