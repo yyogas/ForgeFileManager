@@ -31,6 +31,9 @@ final class IsolationGuard
             throw new FileError('Refusing a system-wide or multi-account storage root.', 503);
         }
         $uid = function_exists('posix_geteuid') ? posix_geteuid() : null;
+        if (!$sandbox && $uid === null) {
+            throw new FileError('POSIX worker UID checks are required for live hosting.', 503);
+        }
         $owner = @fileowner($canonical);
         $expectedUid = (string) getenv('FFM_EXPECTED_UID');
         if ($expectedUid !== '') {
