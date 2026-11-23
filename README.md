@@ -354,3 +354,5 @@ The following behavior is **implemented and locally regression-tested**:
 Run `php tests/integrity-isolation.php` and `bash tests/integrity-http.sh`, in
 addition to the existing tests. In CI, the ZIP extension is mandatory and tests
 will fail rather than silently pass when it is missing.
+
+**Verified read handles:** text editing, downloads, image previews and SHA-256 checksums now open bounded regular-file descriptors and verify inode identity against the authorized pathname before reading. This mitigates link substitution but does not make shared-UID hosting secure.
