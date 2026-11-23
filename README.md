@@ -2,7 +2,7 @@
 
 **A modern, account-scoped PHP file manager for web hosting environments.**
 
-> **Status:** `v0.2.6-alpha` — an original, testable **UI + secure-core foundation**. Not production-ready. Not yet a replacement for cPanel File Manager. This repository has **not** imported the external `filemanager-master` distribution because `https://download.wcp360.com/?dir=filemanager-master` could not be retrieved during this development pass. An audited upstream import/migration remains pending; no upstream source code or provenance is falsely claimed.
+> **Status:** `v0.2.7-alpha` — an original, testable **UI + secure-core foundation**. Not production-ready. Not yet a replacement for cPanel File Manager. This repository has **not** imported the external `filemanager-master` distribution because `https://download.wcp360.com/?dir=filemanager-master` could not be retrieved during this development pass. An audited upstream import/migration remains pending; no upstream source code or provenance is falsely claimed.
 
 Forge File Manager is designed to provide a clean, responsive file-management experience for hosting users while enforcing access through a configured hosting-account filesystem root. The current implementation uses native PHP 8.2+, framework-free JavaScript and CSS with no runtime CDN dependency.
 
@@ -289,7 +289,7 @@ A publicly accessible parent `/ForgeFileManager/` can expose private files
 (e.g. `.env`, docs or dependencies), even when `/public/` itself appears to work.
 Never leave real hosting data or live credentials on an unreviewed alpha deployment.
 
-## v0.2.6-alpha — secure ZIP extraction and batch transfers
+## v0.2.7-alpha — secure ZIP extraction and batch transfers
 
 - ZIP files are inspected and extracted **only** into a new, collision-free directory after entry path/type/CRC/size/rate checks; no overwrites or general-purpose arbitrary archive extraction. Requires ext-zip.
 - Multi-selection Copy/Move handles **1–25 items** per synchronous request and returns item-level results; partial success is explicitly reported and not automatically rolled back.
@@ -297,3 +297,60 @@ Never leave real hosting data or live credentials on an unreviewed alpha deploym
 - Verified locally: existing filesystem, auth, recycle-bin, pagination and batch tests. Full ZIP tests require an ext-zip-enabled CI runner; a skip in a local environment is not proof of ZIP correctness.
 
 See [archive and multi-selection contracts](DOCUMENTATION/ARCHIVES-AND-BULK.md). Never treat this alpha as production-ready without staging verification and an independent security review.
+
+
+## v0.2.7-alpha — isolation and filesystem correctness hardening
+
+The following behavior is **implemented and locally regression-tested**:
+
+- **Account isolation:** session binding now includes the account, canonical storage root,
+  password-hash setting, PHP worker UID and sandbox/live mode. Changing an identity,
+  credential hash or storage root invalidates previous sessions. The configured root
+  cannot be a symlink or a system-wide/shared directory; when POSIX APIs are present,
+  the **hosting account must own its storage root** and the PHP worker must have the
+  same Unix UID. An optional `FFM_EXPECTED_UID` setting locks deployment to one UID.
+- **Symlinks and hardlinks:** both are refused as sources for protected file operations.
+  Hardlinks to files inside the account are intentionally also refused because the other
+  pathname is not reliably discoverable from PHP.
+- **Text editor:** bounded UTF-8 reads and writes, revision hash and advisory lock,
+  complete writes to private temporary files, metadata/contents revalidation before
+  replacement, preservation of the original permission bits, and response metadata
+  containing last modification time. Concurrent external same-UID writers may still
+  race; run distinct hosting customers under distinct Unix identities.
+- **CHMOD:** validated three-digit octal input, world-writable policy, filesystem
+  owner permission enforcement, post-operation inode/mode verification. CHMOD changes
+  file ctime but does not change content mtime. It refuses changing the account root.
+- **Last modified:** directory listing now includes numeric Unix `modified` and
+  ISO UTC `modifiedIso`; editor read/save, CHMOD and ZIP creation report modification
+  timestamps. ZIP extraction restores sane file/directory timestamps if provided.
+- **ZIP compression:** enforced input budget (100 MiB, 2,000 entries, 20 levels),
+  no symbolic links or special files, no overwrite, private temporary ZIP staging,
+  size checks and cleaned-up errors. ZIP extraction continues to enforce traversal,
+  symlink/type, ratio, size, CRC and no-overwrite checks.
+
+### Security requirements and limitations
+
+- **Do not host multiple tenants in one Unix account or PHP-FPM pool.** The PHP path
+  validator is not a substitute for operating-system isolation; file permissions,
+  symlink and hardlink checks do not defeat malicious same-UID processes racing them.
+- Use a dedicated non-root PHP-FPM user for every hosting account. Set
+  `FFM_STORAGE_ROOT` to the account-owned directory, and preferably set
+  `FFM_EXPECTED_UID` to the account UID. Only `public/` may be exposed by HTTP;
+  hide/deny `.ffm-*` temporary paths in managed sites, never expose private `.env`
+  settings. Temporary files are created with restrictive umask, but do not rely
+  on random temporary names alone as an authorization boundary.
+- Development root override is accepted only by the PHP built-in server on an
+  actual loopback connection and with both `FFM_ALLOW_HTTP_DEV=1` and
+  `FFM_ALLOW_ROOT_DEV=1`; **never** use these on a public server.
+- Public `demo/demo123` credentials remain refused for any real hosting account;
+  the explicitly configured isolated local test sandbox remains separate.
+- **ZIP extraction security requires real ext-zip CI execution**, not a local
+  `SKIP`. Local builds without ext-zip return HTTP 501. No claim of complete
+  production security is made pending independent review, staging tests, and an
+  operational filesystem isolation audit.
+
+### Validation
+
+Run `php tests/integrity-isolation.php` and `bash tests/integrity-http.sh`, in
+addition to the existing tests. In CI, the ZIP extension is mandatory and tests
+will fail rather than silently pass when it is missing.

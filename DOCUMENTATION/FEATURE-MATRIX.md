@@ -101,3 +101,19 @@ Legend: `VERIFIED` (tested), `IMPLEMENTED` (code exists; not independently brows
 | Bulk copy/move 1–25 selected items | VERIFIED locally | 13 PHP checks, HTTP security/partial-results smoke |
 | Bulk move rollback | NOT SUPPORTED | Non-atomic results explicitly reported |
 | Background operation progress and cancellation | PLANNED | Synchronous requests only |
+
+
+## 0.2.7-alpha — correctness and isolation validation
+
+| Contract | Status | Evidence |
+| --- | --- | --- |
+| Worker/storage-root ownership and optional expected UID | IMPLEMENTED; locally tested | `tests/integrity-isolation.php` |
+| Session bound to root, credential hash and Unix UID | IMPLEMENTED; locally tested | `IsolationGuard::binding`; HTTP login smoke |
+| Cross-account traversal / symlink / hardlink denial | VERIFIED locally | `tests/integrity-isolation.php`, `tests/integrity-http.sh` |
+| Atomic editor replacement, preserved modes, stale edit rejection | VERIFIED locally | PHP and HTTP integrity regression |
+| CHMOD on real file and folder, verified applied mode | VERIFIED locally | PHP and HTTP integrity regression |
+| Last modification in list / editor / CHMOD | VERIFIED locally | PHP and HTTP integrity regression |
+| ZIP creation with bounded private staging | IMPLEMENTED; ZIP-enabled CI required | `tests/integrity-isolation.php` |
+| ZIP extraction with CRC/type/path checks and mtime | IMPLEMENTED; ZIP-enabled CI required | `tests/archive-extraction.php`, `tests/integrity-http.sh` |
+| Multi-tenant isolation within a shared Unix UID | NOT SUPPORTED | Requires privilege separation; do not deploy |
+| Production readiness / independent adversarial security audit | NOT VERIFIED | Remains a release blocker |

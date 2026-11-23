@@ -73,3 +73,31 @@ The authenticated list API now validates page, search, sort and hidden parameter
 ## v0.2.6 — ZIP extraction and batch transfer threat model
 
 Only ZIP (`ext-zip`) is accepted, with explicit max archive bytes, max expanded bytes, 2,000 entries, 20 levels, 250:1 expansion threshold, regular-files-and-directories-only policy, CRC verification and private-stage cleanup. The service extracts to a new folder rather than merging into a live website. This is **not a virus scanner or a secure sandbox**: once the customer publishes PHP scripts under their website, the hosting runtime's permissions and webserver controls remain the actual execution boundary. Archive contents are not trusted, and PHP filesystem path checks remain vulnerable to hostile same-UID races; production deployment requires independent security review. Bulk copy/move reports partial success; there are no bulk destructive operations or silently executed root commands.
+
+
+## v0.2.7 — account boundary hardening
+
+- The **OS worker UID is the authorization boundary**: one dedicated account user
+  and PHP-FPM pool per tenant; configuration rejects a live root worker, cross-owner
+  storage root, system-wide root paths and storage-root symlinks. The optional
+  `FFM_EXPECTED_UID` further binds deployments to one numeric UID.
+- All authenticated sessions are invalidated if account identity, canonical root,
+  credential hash, execution UID or sandbox/live mode changes.
+- Symlinks and hard-linked regular files are refused. A hardlink's other path may
+  be outside the allowed root, which PHP cannot reliably determine.
+- The editor uses an advisory file lock, optimistic SHA-256 conflict check,
+  private umask for temporary files, inode/content rechecks before publication,
+  and permission preservation; no claim of TOCTOU-proof filesystem operations
+  against hostile same-UID writers is made.
+- CHMOD accepts only ordinary file/directory targets, verifies inode and applied
+  mode after syscall, blocks account-root changes and world-writable permissions
+  by default. Dates are read from `lstat` and reported as UTC/epoch timestamps.
+- ZIP construction checks source trees, uses private staging with cleanup, and
+  must not overwrite a target. Extraction restores validated timestamps in a
+  separate new directory with restrictive 0600 files and 0700 folders.
+- Filesystem account roots that contain publicly served files must deny `.ffm-*`
+  staging paths at the web server. Code and secrets must remain outside webroots.
+
+**Residual risk:** PHP standard filesystem functions cannot provide atomic,
+rename-no-replace operations and secure dirfd-based traversal on their own.
+A dedicated per-tenant OS identity and host security review are required.
