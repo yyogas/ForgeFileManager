@@ -27,7 +27,9 @@ Legend: `VERIFIED` (tested), `IMPLEMENTED` (code exists; not independently brows
 | ZIP extraction | PLANNED | Disabled until security audit |
 | Full directory copy | VERIFIED | Preflight limits and nested-symlink rejection, 21 advanced regression tests + HTTP smoke |
 | Recursive delete | BLOCKED | Intentionally disabled to prevent irreversible mass deletion |
-| Trash / versioning | PLANNED | Not implemented |
+| Recoverable private trash / restore | VERIFIED locally | 14 direct PHP assertions, HTTP test, offline UI rendering; private configuration required |
+| Automatic virtual demo | REMOVED | No public demo fallback; the old demo filesystem is deleted |
+| Versioning / trash retention / purge | PLANNED | Not implemented |
 | ACL/chown | PLANNED | Not implemented |
 | Syntax highlighting / Monaco | PLANNED | Current editor is plain textarea |
 | Hosting panel SSO | PLANNED | No current integration |
@@ -74,3 +76,17 @@ Legend: `VERIFIED` (tested), `IMPLEMENTED` (code exists; not independently brows
 | Jump to arbitrary page | VERIFIED locally | Chromium 301-file fixture; page 10 |
 | Directory scan limit / explicit HTTP 413 | VERIFIED locally | `tests/server-pagination.php` |
 | Cursor/snapshot pagination / indexed search | PLANNED | Offset results may shift under concurrent mutations |
+
+## v0.2.5-alpha — recovery and demo retirement
+
+| Feature | Status | Evidence / limitation |
+| --- | --- | --- |
+| Automatic read-only virtual demonstration | REMOVED | No public demo or synthetic filesystem; source deleted |
+| Visible `demo / demo123` information | IMPLEMENTED | Shown on sign-in screen with local-test-only warning |
+| Explicit localhost test sandbox | VERIFIED locally | Environment, mode and real hosting isolation tests |
+| Public known password on live account | BLOCKED | Production hash rejected and live account required |
+| Private trash initialization | VERIFIED locally | 0700 mode, owner/mount, non-overlap checks |
+| Recoverable file/directory deletion | VERIFIED locally | File/recursive directory moves, symlink denial |
+| Restore and conflict avoidance | VERIFIED locally | Tests for exact bytes and existing targets |
+| Trash modal + pagination | IMPLEMENTED | DOM/browser offline tests; real PHP browser E2E not verified |
+| Retention / purge / audit logging | PLANNED | Requires contracts and tests |

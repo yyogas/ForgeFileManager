@@ -2,7 +2,7 @@
 
 **A modern, account-scoped PHP file manager for web hosting environments.**
 
-> **Status:** `v0.2.4-alpha` — an original, testable **UI + secure-core foundation**. Not production-ready. Not yet a replacement for cPanel File Manager. This repository has **not** imported the external `filemanager-master` distribution because `https://download.wcp360.com/?dir=filemanager-master` could not be retrieved during this development pass. An audited upstream import/migration remains pending; no upstream source code or provenance is falsely claimed.
+> **Status:** `v0.2.5-alpha` — an original, testable **UI + secure-core foundation**. Not production-ready. Not yet a replacement for cPanel File Manager. This repository has **not** imported the external `filemanager-master` distribution because `https://download.wcp360.com/?dir=filemanager-master` could not be retrieved during this development pass. An audited upstream import/migration remains pending; no upstream source code or provenance is falsely claimed.
 
 Forge File Manager is designed to provide a clean, responsive file-management experience for hosting users while enforcing access through a configured hosting-account filesystem root. The current implementation uses native PHP 8.2+, framework-free JavaScript and CSS with no runtime CDN dependency.
 
@@ -12,7 +12,7 @@ Forge File Manager is designed to provide a clean, responsive file-management ex
 ┌────────────────────────────────────────────────────────────────────────────┐
 │ Forge File Manager                  [Language] [Settings] [USER ▾]        │
 ├────────────────────────────────────────────────────────────────────────────┤
-│          [+ Folder] [+ File] [Upload] [Copy] [Move] [CHMOD] [Refresh]     │
+│          [+ Folder] [+ File] [Upload] [Copy] [Move] [CHMOD] [Trash] [Refresh]     │
 ├────────────────────────────────────────────────────────────────────────────┤
 │ home > public_html                                       [List] [Grid]  │
 │ [Search within this folder...]  [Hidden files]  [Sort]                   │
@@ -33,11 +33,11 @@ The username in the top-right header is returned by the authenticated server ses
 
 | Area | Actual implementation |
 | --- | --- |
-| Authentication | Password-hash verification and session for live accounts; virtual read-only demo uses `demo / demo123` when no live account is configured |
+| Authentication | Password-hash login and scoped sessions for live accounts; **no automatic demo**; optional explicitly isolated localhost test login `demo / demo123` |
 | Security | CSRF on mutations, scoped storage root, path-segment and symlink rejection, HTTPS required except explicit development setting |
 | Navigation | Full-width directory browser with breadcrumbs (no sidebar), list/grid, current-folder search, hidden-file toggle, sorting |
 | Header | Dynamic account username, profile dropdown, preferences, notifications |
-| Action toolbar | Create file/folder, multi-file upload, single-file download, copy single file, move, rename, CHMOD, ZIP if extension available, refresh, delete |
+| Action toolbar | Create file/folder, multi-file upload, single-file download, copy single file, move, rename, CHMOD, ZIP if extension available, recycle bin (with private storage), restore, refresh |
 | Context menu | Right-click actions for file, folder and empty background; per-row action button for touch devices |
 | CHMOD | Interactive owner/group/other matrix, live octal and symbolic display, explicit server-side policy |
 | Editor | UTF-8 text editor with CTRL/CMD+S and optimistic SHA-256 conflict checks, 1 MB default limit |
@@ -47,12 +47,13 @@ The username in the top-right header is returned by the authenticated server ses
 | File integrity | On-demand SHA-256 checksum in the Properties dialog for readable regular files up to 100 MiB |
 | Context menu accessibility | Arrow Up / Down, Home, End navigation and menuitem semantics (browser acceptance still required) |
 | Interface | Flat responsive design, centered sub-header, **server-paginated** 25-item list/grid, numbered pages and a jump-to-page control, vertical scroll, dark/light themes, English/French UI |
-| Sample login | `demo / demo123` remains displayed only on the unconfigured sign-in page; there is no banner in the file manager. The backend still isolates this public access to read-only synthetic files. |
+| Test credentials | `demo / demo123` are displayed as an example but are **not accepted on real hosting accounts**. For working local testing, enable `FFM_TEST_SANDBOX=1` with a private owner-only test directory. |
+| Recycle bin | Explicitly configured `FFM_TRASH_ROOT` outside web/account roots; same-device atomic moves; restore files and non-empty directories without deliberate overwrite; HTTP delete blocked if not configured |
 | Testing | PHP filesystem tests and authenticated HTTP smoke tests |
 
 **Server pagination:** `GET /api.php?action=list&path=...&page=...&search=...&sort=...&hidden=...` sorts and filters the **whole directory on the server**, returns only **25 items per page**, and includes `total`, `pages`, `page`, `pageSize` and `hasNext`. Selection applies only to the current page; search and sort reset the page to 1. The jump-to-page control appears when there are more than 7 pages. The default maximum scan is **50,000 entries** (`FFM_LIST_SCAN_LIMIT`), configurable up to 200,000. Exceeding it returns HTTP 413 instead of a misleading truncated result. This is a bounded in-memory, offset-based directory scan (not an index or consistent snapshot); future cursor/indexed pagination is planned for extremely large or concurrently modified folders.
 
-**Not implemented yet:** recursive delete, safe extraction, recycle bin, file versioning, ACL management, advanced syntax highlighting, multi-tenant SSO, quota enforcement, background transfers, resumable chunks, external storage, search indexing, localization of remaining server errors, developer terminal, and plugin SDK. Buttons for unavailable operations are disabled or absent. The UI shows server disk usage **as server volume usage, not as an account quota**.
+**Not implemented yet:** permanent delete, retention/purge automation, safe extraction, file versioning, ACL management, advanced syntax highlighting, multi-tenant SSO, quota enforcement, background transfers, resumable chunks, external storage, search indexing, localization of remaining server errors, developer terminal, and plugin SDK. Buttons for unavailable operations are disabled or absent. The UI shows server disk usage **as server volume usage, not as an account quota**.
 
 ## Requirements
 
@@ -64,29 +65,67 @@ The username in the top-right header is returned by the authenticated server ses
 
 No database, Node build system or Composer installation is required for the first alpha.
 
-## Sample login for an unconfigured test installation
+## Test login: credentials shown, virtual demonstration disabled
 
-If **none** of `FFM_USERNAME`, `FFM_PASSWORD_HASH` or `FFM_STORAGE_ROOT` is set,
-Forge File Manager permits a restricted sample login backed by a **virtual, read-only filesystem** (no live hosting access):
+The previous **automatic virtual demo has been removed**. The login screen
+still displays these known, **test-only** credentials:
 
-- **Username:** `demo`
-- **Password:** `demo123`
-- UI language: **English** by default; switch to **Français** on the login screen or in the header/settings.
-- Demonstration files live in `src/DemoFilesystem.php` as immutable sample data.
-- **No real server files are exposed**; uploads, CHMOD, editing, deletion and downloads are forbidden in this demo.
-- Forcing the demo with `FFM_DEMO_MODE=1` ignores real hosting credentials. Set `FFM_DEMO_MODE=0` to disable the automatic demo in production.
-- Partially configured production credentials **fail closed** instead of falling back to demo.
+- Username: `demo`
+- Password: `demo123`
 
-The user interface has no demonstration-mode banner; the account name is shown normally. This **public test identity** is not an administrative account and does not grant hosting filesystem access.
-**Never configure a real account as `demo / demo123`.** That combination is rejected in live mode.
+On any publicly reachable server, these credentials **must not work** for
+actual hosting files. When `FFM_TEST_SANDBOX` is unset, the server requires
+`FFM_USERNAME`, `FFM_PASSWORD_HASH`, and `FFM_STORAGE_ROOT` and fails closed
+(HTTP 503) if configuration is absent. The live configuration also rejects
+`demo / demo123` even if its password hash is supplied.
 
-This sample login can be tested locally with:
+To try real file creation and recovery **only on a local loopback test server**:
 
 ```bash
+mkdir -p /tmp/ffm-private-test /tmp/ffm-private-trash
+chmod 700 /tmp/ffm-private-test /tmp/ffm-private-trash
+# Set FFM_TEST_SANDBOX=1, FFM_ALLOW_HTTP_DEV=1, and the test paths.
+export FFM_TEST_SANDBOX=1
+export FFM_ALLOW_HTTP_DEV=1
+export FFM_TEST_STORAGE_ROOT=/tmp/ffm-private-test
+export FFM_TEST_TRASH_ROOT=/tmp/ffm-private-trash
 php -S 127.0.0.1:8080 -t public public/router.php
 ```
 
-PHP must run as a non-root account, and insecure HTTP mode (`FFM_ALLOW_HTTP_DEV=1`) may only be enabled in disposable local development.
+Only local connections without forwarded IP headers are accepted. The test
+root must exist, be private (mode 0700), be separate from the application and
+web directories, and not be mixed with live hosting credentials or storage.
+**Do not put this test profile behind a public reverse proxy.**
+
+`FFM_DEMO_MODE=1` is no longer supported. It fails closed instead of
+silently enabling a shared public account.
+
+## Private recycle bin and restoration
+
+The recycle bin is an **optional, explicitly configured** recoverability
+feature. In an isolated PHP-FPM pool per hosting account, create a private
+directory outside both the hosting files root and the web/application root,
+on the **same filesystem** as `FFM_STORAGE_ROOT`:
+
+```bash
+# Example paths only; replace USER with the real hosting user and verify
+# your mount layout before deploying.
+install -d -m 700 -o USER -g USER /srv/forge-private/USER-trash
+# Supply this setting securely to that account's dedicated PHP-FPM pool:
+# FFM_TRASH_ROOT=/srv/forge-private/USER-trash
+```
+
+Deleting through the web API now **moves** a file or non-empty directory into
+private storage; the toolbar's **Recycle bin** opens entries and allows
+restoring their original names and paths. Restores reject existing
+ destinations and missing parent folders; directories containing symlinks are
+refused. The private store is not a backup, and concurrent local filesystem
+changes remain a race. An independent backup policy is still essential.
+
+When no valid `FFM_TRASH_ROOT` is set, the delete action is **disabled** and
+the API returns an explicit 503; it does **not** fall back to permanent deletion.
+Permanent purge, expiry, audit journal, quotas, and retention policies have
+**not** been implemented. Restored items remove their private metadata entry.
 
 ## Local development
 
@@ -134,7 +173,11 @@ Never publish a script that generates or changes real hosting credentials from a
 | `FFM_UPLOAD_MAX_BYTES` | No | Max upload file size, default `104857600` bytes |
 | `FFM_ALLOW_WORLD_WRITABLE` | No | `0` by default; blocks modes granting write to others |
 | `FFM_ALLOW_HTTP_DEV` | No | Must be `0`/unset in production; only for local development |
-| `FFM_DEMO_MODE` | No | Unset: automatic virtual read-only demo only if all three live credentials are absent; `0`: never enable demo; `1`: force isolated demo |
+| `FFM_DEMO_MODE` | Deprecated | `1` is rejected; virtual demo removed |
+| `FFM_TEST_SANDBOX` | No | `1` enables a local-only test identity, never public production |
+| `FFM_TEST_STORAGE_ROOT` | Test only | Private owner-only local test directory outside webroot |
+| `FFM_TEST_TRASH_ROOT` | Test only | Optional private recycle bin for localhost tests |
+| `FFM_TRASH_ROOT` | For recycling | Private same-filesystem directory owned by the account; if unset, HTTP deletion is disabled |
 | `FFM_ALLOW_ROOT_DEV` | No | Must remain `0`/unset in production; root worker prohibited |
 
 See `.env.example`. This is a **reference list**, not an automatically loaded `.env` file: configure actual process environment securely.
@@ -144,7 +187,7 @@ See `.env.example`. This is a **reference list**, not an automatically loaded `.
 - All backend paths are relative to `FFM_STORAGE_ROOT`; empty path represents the account home, **not Linux `/`**.
 - A `..`, absolute path, invalid path component, or symlink traversal is rejected.
 - Changing mode on the account root is blocked; **CHMOD applies only to the selected file/folder** (no recursive changes yet).
-- Deletion is permanent in this alpha and requires confirmation. Directory removal works only for empty folders.
+- Deletion via the API moves files/non-empty folders to an isolated configured private recycle bin and requires confirmation; if not configured, deletion is denied. Restore never intentionally overwrites an existing name.
 - Uploads reject an existing destination rather than overwrite it. File size is bounded by `FFM_UPLOAD_MAX_BYTES` (default 100 MiB) in addition to PHP `upload_max_filesize` and `post_max_size`.
 - Copying a directory performs a preflight and stages a bounded tree. Copying into the same directory produces names such as `directory (copy)`; no overwrites are allowed.
 - The checksum endpoint returns a SHA-256 digest for files up to 100 MiB; it is a best-effort snapshot and is not a signed provenance proof.
@@ -171,14 +214,15 @@ See `.env.example`. This is a **reference list**, not an automatically loaded `.
 php tests/filesystem.php
 php tests/advanced-operations.php
 bash tests/http-smoke.sh
-bash tests/demo-i18n-smoke.sh
+bash tests/test-sandbox-i18n-smoke.sh
+php tests/trash.php
 php tests/deployment-mode.php
 node --check public/assets/app.js
 node tests/ui-structure.test.js
 find src public bin tests -name '*.php' -print0 | xargs -0 -n1 php -l
 ```
 
-Optional offline Chromium tests `tests/browser-i18n.py` and `tests/browser-layout.py` verify locale switching, footer disk usage, no sidebar, a centered toolbar, server-side 25-per-page pagination, search/sort behavior and jump-to-page and restricted public sample credentials using mocked HTTP responses. Live-site browser E2E and accessibility review are still outstanding.
+Optional offline Chromium tests `tests/browser-i18n.py` and `tests/browser-layout.py` verify locale switching, footer disk usage, no sidebar, a centered toolbar, server-side 25-per-page pagination, search/sort behavior and jump-to-page and local-only sandbox credentials using mocked HTTP responses. Live-site browser E2E and accessibility review are still outstanding.
 
 ## Project layout
 
@@ -195,8 +239,8 @@ Optional offline Chromium tests `tests/browser-i18n.py` and `tests/browser-layou
 ├── src/
 │   ├── DirectoryPager.php    # Server-side 25-item filtered/sorted pagination
 │   ├── Filesystem.php        # Account-scoped file operations
-│   ├── DemoFilesystem.php    # Virtual read-only example data
-│   ├── DeploymentMode.php    # Fail-closed deployment profile detection
+│   ├── Trash.php             # Private recycle bin and restoration
+│   ├── DeploymentMode.php    # Local-only test sandbox detection
 │   └── Http.php              # Authentication, CSRF and API routing
 ├── bin/
 │   └── hash-password.php     # Secure credential hash generation helper

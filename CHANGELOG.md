@@ -1,3 +1,22 @@
+## 0.2.5-alpha — 2026-11-23
+
+### Added
+- Private, explicitly configured recycle bin with recoverable file and non-empty-directory moves.
+- Restore dialog, 25-entry recycle-bin pagination, safe conflict handling and bilingual strings.
+- Same-filesystem/owner/private-mode validation for `FFM_TRASH_ROOT`; no public webroot or account overlap.
+- Server-side refusal of symlink-bearing directory trees; bounded recursion and count.
+- Direct PHP, HTTP, locale and offline browser regression suites.
+
+### Changed
+- Disabled/removed the automatic virtual demo and its synthetic sample filesystem.
+- Kept visible `demo / demo123` test credentials, usable exclusively in an explicitly configured **localhost** storage sandbox, never with real hosting data.
+- Deleted HTTP actions now **require** a valid private recycle bin; no silent permanent-delete fallback.
+
+### Remaining limitations
+- Retention, trash quotas, durable audit journal, permanent purge, and dedicated backup/recovery processes remain pending.
+- Concurrency with other processes sharing the account's Unix identity is not fully race-free; independent security review needed.
+- Localhost browser test with real PHP could not be completed in the execution environment; offline Chromium and HTTP tests provide partial coverage.
+
 ## 0.2.4-alpha — 2026-11-23
 
 ### Added / changed

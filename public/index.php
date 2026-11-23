@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once dirname(__DIR__) . '/src/DeploymentMode.php';
-$demoMode = \ForgeFileManager\DeploymentMode::demoEnabled();
+$testSandbox = \ForgeFileManager\DeploymentMode::sandboxEnabled();
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: DENY');
 header('Referrer-Policy: no-referrer');
@@ -15,8 +15,8 @@ header('Content-Security-Policy: default-src \'self\'; script-src \'self\'; styl
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#ffffff">
   <title>Forge File Manager</title>
-  <link rel="stylesheet" href="assets/app.css?v=0.2.4">
-  <script src="assets/app.js?v=0.2.4" defer></script>
+  <link rel="stylesheet" href="assets/app.css?v=0.2.5">
+  <script src="assets/app.js?v=0.2.5" defer></script>
 </head>
 <body>
 <svg class="svg-icons" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -70,21 +70,20 @@ header('Content-Security-Policy: default-src \'self\'; script-src \'self\'; styl
     <h1>Connexion sécurisée</h1>
     <p>Accédez aux fichiers autorisés de votre compte d'hébergement.</p>
     <label class="language-choice"><span>Langue</span><select id="login-language" aria-label="Langue"><option value="en">English</option><option value="fr">Français</option></select></label>
-    <?php if ($demoMode): ?>
-    <div class="login-credentials"><strong>Identifiants de connexion</strong><p><span>Utilisateur :</span> <code>demo</code> <span>Mot de passe :</span> <code>demo123</code></p><small>Accès aux fichiers d’exemple uniquement ; aucune modification des fichiers réels.</small></div>
-    <?php endif; ?>
+    
+    <div class="login-credentials"><strong>Identifiants de connexion</strong><p><span>Utilisateur :</span> <code>demo</code> <span>Mot de passe :</span> <code>demo123</code></p><small>Identifiants réservés aux essais locaux isolés. Inactifs sur un hébergement réel.</small></div>
     <form id="login-form">
-      <label for="login-username">Identifiant</label><input id="login-username" name="username" autocomplete="username" <?php if ($demoMode): ?>value="demo"<?php endif; ?> required>
-      <label for="login-password">Mot de passe</label><input type="password" id="login-password" name="password" autocomplete="current-password" <?php if ($demoMode): ?>value="demo123"<?php endif; ?> required>
+      <label for="login-username">Identifiant</label><input id="login-username" name="username" autocomplete="username" <?php if ($testSandbox): ?>value="demo"<?php endif; ?> required>
+      <label for="login-password">Mot de passe</label><input type="password" id="login-password" name="password" autocomplete="current-password"  required>
       <button class="btn btn-primary btn-full" type="submit">Se connecter</button>
       <div id="login-error" class="form-error" role="alert"></div>
     </form>
-    <?php if (!$demoMode): ?><small>Authentification obligatoire. Aucun identifiant par défaut.</small><?php endif; ?>
+    <small>Authentification obligatoire pour un compte réel. Aucun mot de passe public ne donne accès à ses fichiers.</small>
   </div>
 </div>
 <div id="app" class="app hidden">
   <header class="topbar">
-    <div class="brand"><span class="brand-icon"><svg class="icon"><use href="#i-folder-open"/></svg></span><span class="brand-name">Forge <strong>File Manager</strong></span><span class="version-tag">0.2.4 ALPHA</span></div>
+    <div class="brand"><span class="brand-icon"><svg class="icon"><use href="#i-folder-open"/></svg></span><span class="brand-name">Forge <strong>File Manager</strong></span><span class="version-tag">0.2.5 ALPHA</span></div>
     <div class="topbar-right">
       <label class="language-choice header-language"><span class="sr-only">Langue</span><select id="header-language" aria-label="Langue"><option value="en">English</option><option value="fr">Français</option></select></label>
       <span class="topbar-label">Gestionnaire de fichiers</span>
@@ -115,8 +114,9 @@ header('Content-Security-Policy: default-src \'self\'; script-src \'self\'; styl
       <button class="tool selection-only" data-action="chmod" title="Modifier les permissions CHMOD"><svg class="icon"><use href="#i-shield"/></svg> <span>CHMOD</span></button>
       <button class="tool selection-only toolbar-extra" data-action="zip" title="Compresser en ZIP"><svg class="icon"><use href="#i-archive"/></svg> <span>ZIP</span></button>
       <button class="tool selection-only toolbar-extra" data-action="extract" disabled title="Extraction sécurisée prévue après audit"><svg class="icon"><use href="#i-archive"/></svg> <span>Extraire</span></button>
-      <button class="tool selection-only danger toolbar-extra" data-action="delete" title="Supprimer un fichier ou dossier vide"><svg class="icon"><use href="#i-trash"/></svg> <span>Supprimer</span></button>
+      <button class="tool selection-only danger toolbar-extra" data-action="delete" title="Déplacer dans la corbeille"><svg class="icon"><use href="#i-trash"/></svg> <span>Supprimer</span></button>
       <span class="tool-divider"></span>
+      <button class="tool" data-action="trash-open" title="Ouvrir la corbeille"><svg class="icon"><use href="#i-trash"/></svg><span>Corbeille</span></button>
       <button class="tool" data-action="refresh" title="Actualiser"><svg class="icon"><use href="#i-refresh"/></svg><span class="hide-sm">Actualiser</span></button>
     </div>
   </section>

@@ -34,7 +34,7 @@
 - No distributed revocation / MFA / external SSO or central audit log.
 - Atomic text save is best-effort and can still race an external writer between checks.
 - Uploads do not yet have antivirus scans, content-type policy, quarantine, quota enforcement, or chunked recovery.
-- File operation-level journaling and trash have not been implemented.
+- File operation-level durable journaling and recycle-bin retention have not been implemented.
 - ZIP creation depends on optional ext-zip and has not been verified in this sandbox.
 - UI modal focus trap, accessibility tests and browser E2E tests remain pending.
 - Accounts able to edit site code inherently have powerful execution capability within their hosting user; hosting plans must account for this risk.
@@ -49,18 +49,22 @@ Copying directory trees refuses symlinks, files larger than an aggregate 100 MiB
 
 SHA-256 checksum requests require normal authenticated GET access, regular readable files, and a 100 MiB limit. Uploads are bounded by `FFM_UPLOAD_MAX_BYTES` (default 100 MiB) and by PHP transport-level limits; a client-side check is informational only. No malware detection, storage quota enforcement, or per-IP brute-force protection is claimed. Production deployment still requires independent security assessment.
 
-## Virtual demonstration mode (v0.2.2-alpha)
+## v0.2.5 — public demonstration removed
 
-- The well-known `demo / demo123` credentials are accepted **only** for a virtual
-  read-only demonstration. They never authorize any real file access.
-- Demo is enabled automatically only if all three live credentials are absent.
-  Partial configuration fails closed. Explicit `FFM_DEMO_MODE=0` always disables demo.
-- Demo requests never create the real `Filesystem` object and cannot read,
-  download, upload, write, delete, change permissions, or enumerate real
-  files; server-side denials are mandatory regardless of UI buttons.
-- Live configuration that uses `demo / demo123` is rejected.
-- No filesystem, session, or API isolation claim substitutes for a formal
-  production deployment review. Only `public/` may be exposed via HTTP.
+- The previous virtual read-only demo, its auto-login fallback, and its synthetic filesystem are gone.
+- `demo / demo123` remains shown as **test-only information** on the login page.
+- Known credentials work only after explicit `FFM_TEST_SANDBOX=1` on a local loopback connection, with development HTTP opt-in and an owner-only root wholly separate from the web and hosting filesystem.
+- Existing session mode is compared to the deployment profile, invalidating sessions when the mode changes.
+- Real account configuration using public known credentials is rejected, including if a matching password hash is supplied.
+- `FFM_DEMO_MODE=1` is rejected; absence of real account credentials results in HTTP 503.
+
+## v0.2.5 — private recycle bin
+
+- Private trash path must be owner-only, same owner and filesystem, and outside the hosting, application and public web roots.
+- Files and populated folders are moved using an ordinary filesystem rename, with bounded recursion and refusal of symlinks; no directory tree is immediately destroyed by the public API.
+- Private manifest uses random 128-bit IDs, bounded JSON and strict IDs; restoration validates the original relative account path and never deliberately overwrites an existing path.
+- If private trash is not configured, delete requests fail closed. There is no API purge action, no expiration, and no quota accounting yet.
+- This is **not** a reliable backup, recovery journal, or a race-free security boundary against independent processes under the same Unix identity. Offsite backups and security review remain necessary.
 
 ## v0.2.4 — directory scan controls
 

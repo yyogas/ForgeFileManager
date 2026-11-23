@@ -267,3 +267,18 @@ h1,h2,h3 { margin: 0; }
   .disk-meta { gap: 2px 8px; }
   .pagination { gap: 3px; }
 }
+
+/* Private recycle-bin restoration dialog */
+.recycle-bin { display:flex; flex-direction:column; gap:14px; }
+.recycle-table { width:100%; table-layout:fixed; }
+.recycle-table td { padding:9px 8px; vertical-align:middle; }
+.recycle-table .trash-filename { overflow-wrap:anywhere; width:58%; }
+.recycle-table .trash-date { color:var(--text-soft); font-size:12px; }
+.recycle-table td:last-child { width:130px; text-align:right; }
+.recycle-table .btn { white-space:nowrap; }
+.trash-page-controls { display:flex; justify-content:center; gap:12px; flex-wrap:wrap; }
+@media (max-width:600px) {
+  .recycle-table td { padding:7px 4px; }
+  .recycle-table .trash-date { display:none; }
+  .recycle-table .trash-filename { width:65%; }
+}

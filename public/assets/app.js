@@ -149,9 +149,10 @@
     state.username = payload.username;
     state.csrf = payload.csrf;
     state.capabilities = payload.capabilities ?? {};
-    const demo = !!state.capabilities.readOnly;
+    const readOnly = !!state.capabilities.readOnly;
     for (const button of $$('button[data-action]')) {
-      if (['new-folder','new-file','upload'].includes(button.dataset.action)) button.disabled = demo;
+      if (['new-folder','new-file','upload'].includes(button.dataset.action)) button.disabled = readOnly;
+      if (button.dataset.action === 'trash-open') button.disabled = !state.capabilities.trash;
     }
     $('#account-name').textContent = state.username;
     $('#account-name-menu').textContent = state.username;
@@ -382,6 +383,7 @@
       if (action === 'zip') enabled &&= !!state.capabilities.zip;
       if (action === 'chmod' && !state.capabilities.chmod) enabled = false;
       if (action === 'extract') enabled = false;
+      if (action === 'delete') enabled &&= !!state.capabilities.trash;
       btn.disabled = !enabled || !!state.capabilities.readOnly;
     }
   }
@@ -408,7 +410,7 @@
       ...((file.type==='file'||state.capabilities.copyDirectories)?[['copy','Copier','copy']]:[]),
       ['move','Déplacer','move'],['chmod','Permissions CHMOD','shield'],
       ...(state.capabilities.zip?[['zip','Compresser en ZIP','archive']]:[]),
-      ['properties','Propriétés','info'], ['sep'],['delete','Supprimer','trash']
+      ['properties','Propriétés','info'], ...(state.capabilities.trash ? [['sep'],['delete','Mettre à la corbeille','trash']] : [])
     ] : [['new-folder','Nouveau dossier','folder'],['new-file','Nouveau fichier','plus'],['upload','Importer des fichiers','upload'],['sep'],['refresh','Actualiser','refresh']];
     const menu = $('#context-menu'); menu.replaceChildren();
     if (file?.type === 'symlink') {
@@ -580,10 +582,77 @@
     $('#setting-dense').addEventListener('change',e=>{state.dense=e.target.checked;preferences();});
     $('#setting-hidden').addEventListener('change',e=>{state.showHidden=e.target.checked;preferences();reloadFilters();});
   }
+  async function trashDialog(page = 1) {
+    if (!state.capabilities.trash) {
+      toast(t('La corbeille privée n’est pas configurée.'), true);
+      return;
+    }
+    let listing;
+    try { listing = await get('trash-list', {page}); }
+    catch (error) { toast(error.message,true); return; }
+    const contents = document.createElement('div');
+    contents.className = 'recycle-bin';
+    const intro = document.createElement('p');
+    intro.className = 'modal-subtitle';
+    intro.textContent = t('Les fichiers supprimés sont conservés dans un espace privé. La restauration exige que le dossier parent existe et que le nom soit libre.');
+    contents.append(intro);
+    const table = document.createElement('table');
+    table.className = 'perm-table recycle-table';
+    const body = document.createElement('tbody');
+    const records = Array.isArray(listing.items) ? listing.items : [];
+    if (!records.length) {
+      const p = document.createElement('p');
+      p.textContent = t('La corbeille est vide.');
+      contents.append(p);
+    }
+    for (const item of records) {
+      const tr = document.createElement('tr');
+      const name = document.createElement('td');
+      name.className = 'trash-filename';
+      name.textContent = item.original;
+      const details = document.createElement('td');
+      details.className = 'trash-date';
+      details.textContent = formattedDate(item.deletedAt);
+      const controls = document.createElement('td');
+      const restore = document.createElement('button');
+      restore.type = 'button';
+      restore.className = 'btn btn-primary';
+      restore.textContent = t('Restaurer');
+      restore.addEventListener('click', async () => {
+        restore.disabled = true;
+        try {
+          await api('trash-restore', {id:item.id});
+          toast(t('Fichier restauré.'));
+          await refresh();
+          await trashDialog(listing.page);
+        } catch (error) { toast(error.message,true); restore.disabled = false; }
+      });
+      controls.append(restore);
+      tr.append(name, details, controls);
+      body.append(tr);
+    }
+    table.append(body);
+    if (records.length) contents.append(table);
+    if (listing.pages > 1) {
+      const nav = document.createElement('div');
+      nav.className = 'trash-page-controls';
+      for (const [label, target] of [[t('Page précédente'),listing.page-1],[`${listing.page} / ${listing.pages}`,listing.page],[t('Page suivante'),listing.page+1]]) {
+        const button=document.createElement('button'); button.type='button'; button.className='btn';
+        button.textContent=label;
+        button.disabled=target===listing.page || target<1 || target>listing.pages;
+        button.addEventListener('click',()=>void trashDialog(target));
+        nav.append(button);
+      }
+      contents.append(nav);
+    }
+    openModal(t('Corbeille'),contents,[{text:t('Fermer'),run:closeModal}],{wide:true,kicker:t('RESTAURATION')});
+    applyTranslations();
+  }
+
   function profileDialog() {
     const content = `<p><strong>Compte connecté :</strong> ${escapeHtml(state.username)}</p>
       <p><strong>Racine autorisée :</strong> / (racine du compte, non racine Linux)</p>
-      <p><strong>Version :</strong> 0.2.4-alpha</p>
+      <p><strong>Version :</strong> 0.2.5-alpha</p>
       <p>Cette version utilise une authentification autonome. Les profils revendeurs, le SSO et les quotas par compte sont prévus pour une version ultérieure.</p>`;
     openModal('Mon compte',content,[{text:'Fermer',run:closeModal}],{kicker:'COMPTE HÉBERGEMENT'});
   }
@@ -596,7 +665,7 @@
     closeMenu();
     const file = path ? state.items.find(f=>f.path===path) : oneSelected();
     try {
-      if (state.capabilities.readOnly && !['open','edit','properties','settings','profile','logout','refresh'].includes(action)) {
+      if (state.capabilities.readOnly && !['open','edit','properties','settings','profile','logout','refresh','trash-open'].includes(action)) {
         throw Error(t('Cet accès aux fichiers d’exemple est en lecture seule.'));
       }
       if (['new-file','new-folder'].includes(action)) {
@@ -607,6 +676,7 @@
       }
       if (action==='upload') { $('#upload-picker').click();return; }
       if (action==='refresh') {await refresh();return;}
+      if (action==='trash-open') {await trashDialog();return;}
       if (action==='settings') {settingsDialog();return;}
       if (action==='profile') {profileDialog();return;}
       if (action==='logout') { await api('logout');showLogin();return; }
@@ -644,8 +714,9 @@
         });return;
       }
       if (action==='delete'){
-        askConfirm('Confirmer la suppression',t('Supprimer définitivement « {file} » ? Les dossiers non vides ne peuvent pas être supprimés. Cette version ne possède pas encore de corbeille.',{file:file.name}),async()=>{
-          await api('delete',{path:file.path});toast(t('deleted'));await refresh();
+        if (!state.capabilities.trash) throw Error(t('La corbeille privée n’est pas configurée.'));
+        askConfirm('Mettre à la corbeille',t('Déplacer « {file} » dans la corbeille privée ? Vous pourrez restaurer ce fichier ou dossier depuis la barre d’actions.',{file:file.name}),async()=>{
+          await api('delete',{path:file.path});toast(t('Élément déplacé dans la corbeille.'));await refresh();
         },true);return;
       }
     }catch(error){toast(error.message,true);}

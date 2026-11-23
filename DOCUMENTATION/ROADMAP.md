@@ -13,7 +13,7 @@
 
 ## P1 — Safe operations
 
-- [ ] Recycle bin and restore with retention limits.
+- [x] Minimal private recycle bin with file/folder restore (opt-in; alpha) — retention limits remain to be designed.
 - [x] Bounded directory copy with nested-symlink refusal, staging and preflight; move-into-descendant rejection.
 - [x] Collision-free file/folder duplication.
 - [x] SHA-256 on-demand file integrity check (100 MiB synchronous limit).
@@ -56,7 +56,7 @@ Each checkbox is an engineering work item, not a product promise. Publish only t
 - File list scrollbar and sticky table headers.
 - Page navigation controls with 25 items max for list/grid, and page reset on filters.
 - Server disk usage moved to footer and labeled separately from account quota.
-- Only sample sign-in information remains; no demo-mode banner. Public test access remains restricted server-side.
+- Only sample sign-in information remains; no demo-mode banner. Public test credentials are disabled outside an explicit isolated localhost sandbox.
 
 ## v0.2.4 — complete: bounded server-side pagination
 
@@ -70,7 +70,17 @@ Each checkbox is an engineering work item, not a product promise. Publish only t
 
 ## Next: reliable recovery and archive handling
 
-- [ ] Versioned recycle-bin policy with retention/quota, per-account isolation, and file/folder restore.
+- [x] Private recycle-bin path validation, moves and file/folder restoration.
+- [ ] Audited retention, permanent purge, quota, recovery journaling and concurrency hardening.
 - [ ] ZIP extraction with path traversal, symlink and archive-bomb defenses.
 - [ ] Integrate controlled multi-selection operations with atomic preflight and audit.
 - [ ] Continue accessibility audits and real staging URL end-to-end tests.
+
+## v0.2.5 — recoverable operations (alpha)
+
+- [x] No automatic demo; known sample credentials remain visible and restricted to explicit localhost testing.
+- [x] Private recycle-bin capability, recoverable file/nonempty-folder move, restoration, 25-item list, UI modal and API gating.
+- [x] Unit and HTTP tests covering isolation, symlink denial, colliding restore, owner-only location and CRUD within the local sandbox.
+- [ ] Design/verify durable transaction journaling, audit attribution, trash retention and quotas.
+- [ ] Optional purge with bounded recursive safety and soft-delete expiry; no destructive CLI shortcuts.
+- [ ] Independent review of concurrent OS-level filesystem mutation and controlled backup/restore drills.

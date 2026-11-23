@@ -7,15 +7,15 @@ Clean, professional, flat surfaces. No gradients or decorative color strips at t
 ## Core layout
 
 1. **Global header:** Brand, contextual description, notifications, settings, authenticated username with avatar and dropdown.
-2. **Centered action sub-header:** New folder, new file, upload, download, copy, move, rename, CHMOD, ZIP, delete, refresh. Disabled when operation cannot apply. Compact on smaller screens.
+2. **Centered action sub-header:** New folder, new file, upload, download, copy, move, rename, CHMOD, ZIP, recycle bin, move to trash, refresh. Disabled when operation cannot apply. Compact on smaller screens.
 3. **Navigation:** Full-width breadcrumb navigation without a sidebar or redundant explorer title.
 4. **Main panel:** Breadcrumbs, current-folder search, hidden-file toggle, sorting, list/grid, selectable rows, per-item menu, constrained scroll area and 25-item pages.
 5. **Status bar:** Current path, file/selection count, server disk usage (unavailable fallback and a visible disclaimer that it is not an account quota), connection status.
 
 ## Context menus
 
-- **File:** Open/Edit, Download, Rename, Copy, Move, CHMOD, ZIP, Properties, Delete.
-- **Folder:** Open, Rename, Move, CHMOD, ZIP, Properties, Delete empty only.
+- **File:** Open/Edit, Download, Rename, Copy, Move, CHMOD, ZIP, Properties, Move to recycle bin (when enabled).
+- **Folder:** Open, Rename, Move, CHMOD, ZIP, Properties, Move to recycle bin (including non-empty folders, when enabled).
 - **Blank area:** New folder, New file, Upload, Refresh.
 - **Symlinks:** Properties only (access blocked).
 
@@ -44,7 +44,7 @@ The Copy action supports files and folders when `me.capabilities.copyDirectories
 - Added client-side pagination: 25 visible files/folders per page after search/hidden filters/sort, numbered pages, previous/next, range indicator, reset on navigation/filter/sort, selection scoped to the current page.
 - Vertical scroll bar stays inside the file listing rather than scrolling the whole page. Table headers are sticky.
 - Relocated the server-volume disk meter to the footer. If the server cannot provide usage, show "Unavailable" instead of inventing quota metrics.
-- Removed the visual read-only demo banner while retaining `demo / demo123` on an unconfigured login screen. Backend read-only virtual isolation is not weakened.
+- Removed the visual read-only demo banner while retaining `demo / demo123` as an explicitly local-test-only hint on the login screen. The previous virtual demo backend is removed.
 - Historical limitation resolved in v0.2.4: earlier responses returned at most `FFM_MAX_ENTRIES` entries. See server-side pagination below.
 
 ## v0.2.4 — server pagination and navigation
@@ -54,3 +54,12 @@ The Copy action supports files and folders when `me.capabilities.copyDirectories
 - Pagination includes previous/next, page numbers, range indicator and a direct jump field for folders longer than 7 pages.
 - Search requests are debounced (200 ms). Responses for superseded searches/pages are ignored instead of overwriting newer results.
 - The existing full-width UI, centered toolbar, sticky table header, vertical scroll area, footer storage meter and English/French support remain unchanged.
+
+## v0.2.5 — recoverable delete / restore UX
+
+- Toolbar: always display the Recycle bin button but disable it when the private trash store is unavailable.
+- File/directory context menu and Delete key: offer "Move to recycle bin" only when the API advertises `capabilities.trash=true`.
+- Confirmation describes a recoverable move; never claim permanent deletion or direct trash availability without the actual backend capability.
+- Recycle bin modal lists original paths, deletion time, restore actions and paging at 25 entries per screen.
+- Restore reports collisions, missing parent directories and server errors; no implicit overwrite or silent rename of restored files.
+- The UI retains no sidebar, has a centered toolbar, footer volume statistics and bounded server pagination.

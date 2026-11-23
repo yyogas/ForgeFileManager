@@ -3,11 +3,12 @@ set -Eeuo pipefail
 cd "$(dirname "$0")/.."
 work="$(mktemp -d)"
 root="$work/hosting"
-mkdir -p "$root"
+mkdir -p "$root" "$work/private-trash"
+chmod 700 "$work/private-trash"
 port="$(python3 -c 'import socket;s=socket.socket();s.bind(("127.0.0.1",0));print(s.getsockname()[1]);s.close()')"
 pass='test-password-1234'
 hash="$(php -r 'echo password_hash("test-password-1234",PASSWORD_DEFAULT);')"
-FFM_USERNAME=testuser FFM_PASSWORD_HASH="$hash" FFM_STORAGE_ROOT="$root" FFM_UPLOAD_MAX_BYTES=65536 FFM_ALLOW_HTTP_DEV=1 FFM_ALLOW_ROOT_DEV=1 \
+FFM_USERNAME=testuser FFM_PASSWORD_HASH="$hash" FFM_STORAGE_ROOT="$root" FFM_TRASH_ROOT="$work/private-trash" FFM_UPLOAD_MAX_BYTES=65536 FFM_ALLOW_HTTP_DEV=1 FFM_ALLOW_ROOT_DEV=1 \
   php -S "127.0.0.1:$port" -t public public/router.php >"$work/server.log" 2>&1 &
 pid=$!
 cleanup(){ kill "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true; rm -rf "$work"; }

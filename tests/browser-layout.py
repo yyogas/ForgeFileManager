@@ -3,7 +3,7 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 import os,re,subprocess,json
 r=Path(__file__).resolve().parents[1]
-env={**os.environ,'FFM_DEMO_MODE':'1'}
+env={**os.environ,'FFM_TEST_SANDBOX':'1'}
 html=subprocess.check_output(['php','-r','include "public/index.php";'],cwd=r,env=env,text=True)
 html=re.sub(r'<script src="assets/app.js\?v=[^\"]+" defer></script>','',html)
 html=re.sub(r'<link rel="stylesheet" href="assets/app.css\?v=[^\"]+">','',html)
@@ -21,7 +21,7 @@ window.fetch = async (uri,opts={}) => {
  const action = url.searchParams.get('action');
  if (action === 'login') window.demoLoggedIn = true;
  const payload = url.pathname.endsWith('en.json') ? EN : url.pathname.endsWith('fr.json') ? FR :
- action === 'me' ? (window.demoLoggedIn ? {ok:true,username:'demo',csrf:'token',capabilities:{readOnly:true,checksum:true,chmod:false,upload:false,copyDirectories:false,zip:false}} : {ok:false,error:'Authentication required'}) :
+ action === 'me' ? (window.demoLoggedIn ? {ok:true,username:'demo',csrf:'token',capabilities:{testSandbox:true,readOnly:false,checksum:true,chmod:true,upload:true,copyDirectories:true,zip:false,trash:true}} : {ok:false,error:'Authentication required'}) :
  action === 'login' ? {ok:true,username:'demo',csrf:'token'} :
  action === 'list' ? {ok:true,data:(() => {
    window.listRequests = (window.listRequests || []).concat([{page:url.searchParams.get('page'),search:url.searchParams.get('search'),sort:url.searchParams.get('sort')}]);
@@ -50,6 +50,7 @@ with sync_playwright() as p:
  page.locator('#login-view:not(.hidden)').wait_for()
  assert 'demo123' in page.locator('.login-credentials').inner_text()
  assert 'Mode démonstration' not in page.locator('body').inner_text()
+ page.locator('#login-password').fill('demo123')
  page.locator('#login-form button[type=submit]').click()
  page.locator('#app:not(.hidden)').wait_for()
  assert page.locator('.sidebar,#mobile-sidebar,#demo-mode-flag,.panel-heading h1').count()==0
@@ -87,7 +88,7 @@ with sync_playwright() as p:
  page.wait_for_function("document.querySelector('#pagination-summary').textContent==='Éléments 1–25 sur 61'")
  assert page.locator('.disk-meta strong').inner_text()=='Espace disque serveur'
  assert page.locator('#disk-numbers').inner_text()=='Indisponible'
- assert page.locator('[data-action="new-folder"]').is_disabled()
+ assert page.locator('[data-action="new-folder"]').is_enabled()
  page.set_viewport_size({'width':390,'height':760})
  assert page.locator('#status-disk').count()==0 or page.locator('.status-disk').is_visible()
  assert page.locator('.sidebar').count()==0

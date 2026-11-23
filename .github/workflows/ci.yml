@@ -25,12 +25,16 @@ jobs:
         run: php tests/server-pagination.php
       - name: Server pagination HTTP contract
         run: bash tests/server-pagination-http.sh
+      - name: Fail-closed deletion and disabled demo HTTP suite
+        run: bash tests/fail-closed-http.sh
       - name: Authenticated HTTP smoke suite
         run: bash tests/http-smoke.sh
       - name: Nested public-path deployment smoke suite
         run: bash tests/nested-installation.sh
-      - name: Virtual demo and bilingual UI HTTP security regression
-        run: bash tests/demo-i18n-smoke.sh
+      - name: Isolated test account and bilingual UI HTTP regression
+        run: bash tests/test-sandbox-i18n-smoke.sh
+      - name: Private recycle-bin tests
+        run: php tests/trash.php
       - name: Deployment mode unit tests
         run: php tests/deployment-mode.php
       - name: JavaScript syntax validation

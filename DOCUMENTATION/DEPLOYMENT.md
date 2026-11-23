@@ -65,9 +65,20 @@ Browser-based UI and accessibility tests are still outstanding.
 
 The file intentionally exits unless executed by PHP CLI. Run `php bin/hash-password.php`
 through SSH. Do not grant HTTP access to `bin/`, `src/`, secrets, or storage.
-For a quick preview, an unconfigured instance automatically provides a **virtual,
-read-only** login (`demo / demo123`) without using any real hosting filesystem.
-Set `FFM_DEMO_MODE=0` to disable demo fallback in production.
+The former auto-starting virtual demo has been removed. The login UI still shows
+`demo / demo123` as a test hint; those known credentials work **only** in an
+explicitly configured local, private test sandbox. Public installations require
+real credentials created by the CLI helper.
+
+## Private recycle-bin deployment
+
+- Provision a separate, owner-only `FFM_TRASH_ROOT` on the same filesystem as
+  `FFM_STORAGE_ROOT`, outside both the account root and all web/application paths.
+- Configure it in the dedicated non-root PHP-FPM pool, then check that
+  `GET api.php?action=me` advertises `capabilities.trash=true` after login.
+- If unset or invalid, deletion through HTTP is blocked rather than permanent.
+- Recovery is alpha-grade; retention, audited purge, snapshots and verified
+  disaster recovery remain future work. Do not point trash at a shared directory.
 
 ## Language preference
 

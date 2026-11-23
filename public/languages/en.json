@@ -183,5 +183,17 @@
   "Numéro de page": "Page number",
   "Aller": "Go",
   "Numéro de page invalide.": "Invalid page number.",
-  "Réponse de pagination invalide.": "Invalid pagination response."
+  "Réponse de pagination invalide.": "Invalid pagination response.",
+  "Corbeille": "Recycle bin",
+  "Mettre à la corbeille": "Move to recycle bin",
+  "Restaurer": "Restore",
+  "RESTAURATION": "RECOVERY",
+  "La corbeille privée n’est pas configurée.": "The private recycle bin is not configured.",
+  "La corbeille est vide.": "The recycle bin is empty.",
+  "Fichier restauré.": "Item restored.",
+  "Élément déplacé dans la corbeille.": "Item moved to the recycle bin.",
+  "Les fichiers supprimés sont conservés dans un espace privé. La restauration exige que le dossier parent existe et que le nom soit libre.": "Deleted files remain in private storage. Restoring requires the original parent folder to exist and the filename to be available.",
+  "Déplacer « {file} » dans la corbeille privée ? Vous pourrez restaurer ce fichier ou dossier depuis la barre d’actions.": "Move “{file}” to the private recycle bin? You can restore the file or directory from the toolbar.",
+  "Identifiants réservés aux essais locaux isolés. Inactifs sur un hébergement réel.": "Credentials reserved for isolated local testing. Inactive on real hosting accounts.",
+  "Authentification obligatoire pour un compte réel. Aucun mot de passe public ne donne accès à ses fichiers.": "A real hosting account requires authentication. No public password grants access to its files."
 }

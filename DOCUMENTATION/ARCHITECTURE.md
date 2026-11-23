@@ -1,4 +1,4 @@
-# Architecture — v0.2.4-alpha
+# Architecture — v0.2.5-alpha
 
 ## Current composition
 
@@ -8,6 +8,8 @@
 - `public/api.php`: single API entry point.
 - `src/Http.php`: authentication, server-session state, CSRF, dispatch, JSON and downloads.
 - `src/Filesystem.php`: strict relative paths, bounded directory scans, authorized file operations.
+- `src/Trash.php`: private same-device recycle-bin moves, listing, restore and source safety checks.
+- `src/DeploymentMode.php`: no auto-demo; explicit localhost-only sandbox for known test credentials.
 - `src/DirectoryPager.php`: tested server-side search, directory-first sort, and 25-entry response slice.
 
 No database is used. Every request is checked against the configured environment and authenticated PHP session.
@@ -20,7 +22,7 @@ The first deployment profile uses *one PHP-FPM pool per hosting account*, with `
 
 GET `?action=me`, `list&path=...`, `read&path=...`, `download&path=...`, `preview&path=...`.
 
-POST JSON: `login`, `logout`, `create`, `rename`, `chmod`, `save`, `delete`, `copy`, `move`, `zip`.
+POST JSON: `login`, `logout`, `create`, `rename`, `chmod`, `save`, `delete`, `copy`, `move`, `zip`, `trash-restore`.
 
 POST multipart: `upload`, file field `file`, directory field `path`, header `X-CSRF-Token`.
 
@@ -56,6 +58,16 @@ Example JSON data shape:
 }
 ```
 
-The entire authorized directory is scanned and sorted before returning a maximum of 25 detailed entries. The scan stops with a **413** error when more than `FFM_LIST_SCAN_LIMIT` entries exist (default 50,000; maximum 200,000). Search is case-insensitive and uses `mb_stripos` when available. All directories sort ahead of regular files and symlinks; equal sort keys use name ordering. Both live and virtual read-only demo share the same paginator.
+The entire authorized directory is scanned and sorted before returning a maximum of 25 detailed entries. The scan stops with a **413** error when more than `FFM_LIST_SCAN_LIMIT` entries exist (default 50,000; maximum 200,000). Search is case-insensitive and uses `mb_stripos` when available. All directories sort ahead of regular files and symlinks; equal sort keys use name ordering. The removed virtual demo does not participate in pagination; local test storage uses the normal scoped filesystem backend.
 
 This avoids transferring all records into the browser but is still an O(N log N) in-memory sort, not a database-backed indexed search. It is not transactionally consistent under concurrent renames/deletes; an entry may disappear between listing and rendering. Strong cursor/snapshot semantics remain future work. `FFM_MAX_ENTRIES` continues to constrain copy/ZIP operations independently.
+
+## Private recycle-bin contracts — v0.2.5
+
+- `GET ?action=trash-list&page=1` returns private entries and metadata, 25 per page.
+- `POST ?action=delete` with `{ "path":"..." }` moves the selected file/folder, requiring CSRF, session and a configured `FFM_TRASH_ROOT`; returns an opaque, random ID.
+- `POST ?action=trash-restore` with `{ "id":"32-lowercase-hex" }` attempts to restore only to its original account path; no caller-controlled destination is accepted.
+- No HTTP permanent-delete endpoint exists. `Filesystem::remove()` remains an internal legacy helper but is not routed to an API action.
+- Private trash location must be outside storage root/application/webroot, owner-only, same owner and device as account storage. Renames are non-copying; cross-device moves fail.
+- Restores reject missing parent directories or existing destinations. Concurrent modifications by external processes sharing the OS account remain a TOCTOU risk.
+- The private storage and data model are alpha-level, without retention, quota accounting, purge, transactional journal, or cross-node coordination.

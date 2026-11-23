@@ -2,10 +2,8 @@
 declare(strict_types=1);
 
 require dirname(__DIR__) . '/src/Filesystem.php';
-require dirname(__DIR__) . '/src/DemoFilesystem.php';
 
 use ForgeFileManager\Filesystem;
-use ForgeFileManager\DemoFilesystem;
 use ForgeFileManager\FileError;
 
 $root = sys_get_temp_dir() . '/ffm-listing-' . bin2hex(random_bytes(8));
@@ -60,9 +58,6 @@ try {
     catch (FileError $e) { verify($e->getCode() === 400, 'Unknown sort rejected'); }
     try { $fs->listing('', 1, str_repeat('x', 201)); throw new RuntimeException('Long search accepted'); }
     catch (FileError $e) { verify($e->getCode() === 400, 'Excessive search rejected'); }
-    $demo = DemoFilesystem::listing('');
-    verify($demo['total'] === 3 && $demo['pageSize'] === 25, 'Virtual demo exposes the same server pagination contract');
-    verify(DemoFilesystem::listing('', 2)['page'] === 1, 'Virtual demo clamps stale page to available range');
     echo "\nDirectory pagination: {$checks} passed / 0 failed\n";
 } catch (Throwable $e) {
     fwrite(STDERR, "FAIL: {$e->getMessage()}\n");
