@@ -62,7 +62,11 @@ final class ArchiveExtractor
                 self::mkdirs($stage, dirname($entry['name']));
                 $from = $zip->getStreamIndex($entry['index']);
                 if (!is_resource($from)) throw new FileError('ZIP entry cannot be decompressed.', 415);
-                $to = @fopen($absolute, 'xb');
+                // Archive staging is restricted to 0600 from file creation;
+                // the host's default umask might otherwise create 0644 files.
+                $priorUmask = umask(0077);
+                try { $to = @fopen($absolute, 'xb'); }
+                finally { umask($priorUmask); }
                 if (!is_resource($to)) {
                     fclose($from);
                     throw new FileError('ZIP entry cannot be written safely.', 409);
@@ -91,6 +95,9 @@ final class ArchiveExtractor
                 } finally {
                     fclose($from);
                     fclose($to);
+                }
+                if (!@chmod($absolute, 0600)) {
+                    throw new FileError('Could not secure extracted file permissions.', 500);
                 }
                 if ($entry['mtime'] !== null && !@touch($absolute, $entry['mtime'])) {
                     throw new FileError('Could not restore ZIP file modification date.', 500);
