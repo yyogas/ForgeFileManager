@@ -315,7 +315,7 @@ A publicly accessible parent `/ForgeFileManager/` can expose private files
 (e.g. `.env`, docs or dependencies), even when `/public/` itself appears to work.
 Never leave real hosting data or live credentials on an unreviewed alpha deployment.
 
-## v0.2.8-alpha — secure ZIP extraction and batch transfers
+## v0.2.6-alpha — secure ZIP extraction and batch transfers
 
 - ZIP files are inspected and extracted **only** into a new, collision-free directory after entry path/type/CRC/size/rate checks; no overwrites or general-purpose arbitrary archive extraction. Requires ext-zip.
 - Multi-selection Copy/Move handles **1–25 items** per synchronous request and returns item-level results; partial success is explicitly reported and not automatically rolled back.
@@ -325,7 +325,7 @@ Never leave real hosting data or live credentials on an unreviewed alpha deploym
 See [archive and multi-selection contracts](DOCUMENTATION/ARCHIVES-AND-BULK.md). Never treat this alpha as production-ready without staging verification and an independent security review.
 
 
-## v0.2.8-alpha — isolation and filesystem correctness hardening
+## v0.2.7-alpha — isolation and filesystem correctness hardening
 
 The following behavior is **implemented and locally regression-tested**:
 
