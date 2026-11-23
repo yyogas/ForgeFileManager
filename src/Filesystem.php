@@ -16,8 +16,9 @@ final class Filesystem
     private string $root;
     private int $maxEditBytes;
     private int $maxEntries;
+    private int $maxUploadBytes;
 
-    public function __construct(string $root, int $maxEditBytes = 1048576, int $maxEntries = 2000)
+    public function __construct(string $root, int $maxEditBytes = 1048576, int $maxEntries = 2000, int $maxUploadBytes = 104857600)
     {
         $real = realpath($root);
         if ($real === false || $real === DIRECTORY_SEPARATOR || !is_dir($real)) {
@@ -26,6 +27,12 @@ final class Filesystem
         $this->root = rtrim($real, DIRECTORY_SEPARATOR);
         $this->maxEditBytes = max(1024, $maxEditBytes);
         $this->maxEntries = max(10, $maxEntries);
+        $this->maxUploadBytes = max(1, $maxUploadBytes);
+    }
+
+    public function maxUploadBytes(): int
+    {
+        return $this->maxUploadBytes;
     }
 
     public function root(): string
@@ -296,6 +303,99 @@ final class Filesystem
         return ['deleted' => $this->relative($relative)];
     }
 
+    /**
+     * Inspect a tree before copying. Refuse links and unsupported special files,
+     * cap size, entry count and depth. This is a bounded synchronous operation,
+     * not a race-free substitute for per-account OS isolation.
+     *
+     * @param array{entries:int,bytes:int} $budget
+     */
+    private function preflightCopy(string $path, string $relative, array &$budget, int $depth = 0): void
+    {
+        if ($depth > 20 || ++$budget['entries'] > min(2000, $this->maxEntries)) {
+            throw new FileError('Folder copy exceeds the 2000 entry or 20 level limit.', 413);
+        }
+        if (is_link($path)) {
+            throw new FileError('Folder copy cannot contain symbolic links.', 403);
+        }
+        // Revalidate each component, not just the outer folder.
+        $this->resolve($relative);
+        if (is_file($path)) {
+            if (!is_readable($path)) {
+                throw new FileError('One of the source files is unreadable.', 403);
+            }
+            $size = filesize($path);
+            if ($size === false || ($budget['bytes'] += $size) > 100 * 1024 * 1024) {
+                throw new FileError('Folder copy exceeds the 100 MB content limit.', 413);
+            }
+            return;
+        }
+        if (!is_dir($path) || !is_readable($path)) {
+            throw new FileError('Folder copy requires regular files and readable folders.', 403);
+        }
+        foreach (new DirectoryIterator($path) as $item) {
+            if ($item->isDot()) continue;
+            $name = $item->getFilename();
+            $this->preflightCopy($item->getPathname(), $relative . '/' . $name, $budget, $depth + 1);
+        }
+    }
+
+    /** Copy only inspected regular files and directories into a private staging directory. */
+    private function copyTree(string $source, string $dest, int $depth = 0): void
+    {
+        if ($depth > 20 || is_link($source)) {
+            throw new FileError('Unsafe folder entry encountered during copy.', 403);
+        }
+        if (is_dir($source)) {
+            if (!@mkdir($dest, 0700)) {
+                throw new FileError('Could not create destination directory.', 500);
+            }
+            foreach (new DirectoryIterator($source) as $item) {
+                if (!$item->isDot()) {
+                    $this->copyTree($item->getPathname(), $dest . '/' . $item->getFilename(), $depth + 1);
+                }
+            }
+            @chmod($dest, (fileperms($source) & 0755) ?: 0700);
+            return;
+        }
+        if (!is_file($source) || !is_readable($source)) {
+            throw new FileError('Unsafe or unreadable file encountered during copy.', 403);
+        }
+        $from = @fopen($source, 'rb');
+        $to = @fopen($dest, 'xb');
+        if ($from === false || $to === false) {
+            if (is_resource($from)) fclose($from);
+            if (is_resource($to)) fclose($to);
+            throw new FileError('Could not copy a source file.', 500);
+        }
+        try {
+            $size = filesize($source);
+            if ($size === false || $size > 100 * 1024 * 1024 || stream_copy_to_stream($from, $to, $size + 1) !== $size) {
+                throw new FileError('Source file changed or copy was interrupted.', 409);
+            }
+            fflush($to);
+        } finally {
+            fclose($from);
+            fclose($to);
+        }
+        @chmod($dest, fileperms($source) & 0644);
+    }
+
+    /** Remove only a temporary staging tree, without following symlinks. */
+    private function cleanupCopyStage(string $path): void
+    {
+        if (is_link($path) || is_file($path)) {
+            @unlink($path);
+            return;
+        }
+        if (!is_dir($path)) return;
+        foreach (new DirectoryIterator($path) as $item) {
+            if (!$item->isDot()) $this->cleanupCopyStage($item->getPathname());
+        }
+        @rmdir($path);
+    }
+
+    /** @return array{path:string} */
     public function transfer(string $relative, string $directory, string $action): array
     {
         [$sourceParent] = $this->parentOf($relative);
@@ -305,44 +405,84 @@ final class Filesystem
         if (!is_dir($targetDir) || !is_writable($targetDir)) {
             throw new FileError('Target directory is not writable.', 403);
         }
+        if ($action !== 'copy' && $action !== 'move') {
+            throw new FileError('Unsupported transfer operation.', 400);
+        }
+        if (is_dir($source) && ($targetDir === $source || str_starts_with($targetDir, $source . '/'))) {
+            throw new FileError('Cannot copy or move a directory into itself or a descendant.', 400);
+        }
         $name = basename($source);
-        if ($action === 'copy' && is_file($source)) {
-            $extension = pathinfo($name, PATHINFO_EXTENSION);
-            $stem = $extension ? substr($name, 0, -strlen($extension) - 1) : $name;
-            $newName = $name;
-            if (file_exists($targetDir . '/' . $newName)) {
-                $newName = $stem . ' (copy)' . ($extension ? '.' . $extension : '');
+        $newName = $name;
+        if ($action === 'copy') {
+            $ext = is_file($source) ? pathinfo($name, PATHINFO_EXTENSION) : '';
+            $stem = $ext === '' ? $name : substr($name, 0, -strlen($ext) - 1);
+            for ($i = 0; $i < 100; $i++) {
+                $suffix = $i === 0 ? '' : ($i === 1 ? ' (copy)' : ' (copy ' . $i . ')');
+                $candidate = $stem . $suffix . ($ext === '' ? '' : '.' . $ext);
+                if (strlen($candidate) > 255) throw new FileError('Filename is too long to duplicate.', 400);
+                if (!file_exists($targetDir . '/' . $candidate) && !is_link($targetDir . '/' . $candidate)) {
+                    $newName = $candidate;
+                    break;
+                }
+                if ($i === 99) throw new FileError('Too many duplicate names in the destination.', 409);
             }
-            $relativeTarget = ($parentRel ? $parentRel . '/' : '') . $newName;
-            $target = $this->resolve($relativeTarget, false);
-            if (file_exists($target) || is_link($target) || !@copy($source, $target)) {
-                throw new FileError('Copy failed or destination exists.', 409);
+        }
+        $relativeTarget = ($parentRel ? $parentRel . '/' : '') . $newName;
+        $target = $this->resolve($relativeTarget, false);
+        if ($action === 'move') {
+            if (!is_writable($sourceParent) || $source === $target || file_exists($target) || is_link($target) || !@rename($source, $target)) {
+                throw new FileError('Move failed or destination exists.', 409);
             }
             return ['path' => $relativeTarget];
         }
-        if ($action !== 'move') {
-            throw new FileError('Copying directories is not available in the first release.', 422);
+        $budget = ['entries' => 0, 'bytes' => 0];
+        $this->preflightCopy($source, $this->relative($relative), $budget);
+        $stage = $targetDir . '/.ffm-copy-' . bin2hex(random_bytes(12));
+        try {
+            $this->copyTree($source, $stage);
+            if (file_exists($target) || is_link($target) || !@rename($stage, $target)) {
+                throw new FileError('Copy target already exists or could not be published.', 409);
+            }
+        } finally {
+            $this->cleanupCopyStage($stage);
         }
-        if (!is_writable($sourceParent)) {
-            throw new FileError('Source directory is not writable.', 403);
+        return ['path' => $relativeTarget, 'filesAndFolders' => $budget['entries'], 'bytes' => $budget['bytes']];
+    }
+
+    /**
+     * Bounded checksum verification for individual files, never directory trees.
+     * SHA-256 may take time on large files: limit 100 MB in the synchronous API.
+     */
+    public function checksum(string $relative): array
+    {
+        $path = $this->resolve($relative);
+        if (!is_file($path) || !is_readable($path)) {
+            throw new FileError('Checksums require a readable regular file.', 403);
         }
-        if (is_dir($source) && ($targetDir === $source || str_starts_with($targetDir, $source . '/'))) {
-            throw new FileError('Cannot move a directory into itself.', 400);
+        $size = filesize($path);
+        if ($size === false || $size > 100 * 1024 * 1024) {
+            throw new FileError('Checksums currently support files up to 100 MB.', 413);
         }
-        $relativeTarget = ($parentRel ? $parentRel . '/' : '') . $name;
-        $target = $this->resolve($relativeTarget, false);
-        if ($source === $target || file_exists($target) || is_link($target) || !@rename($source, $target)) {
-            throw new FileError('Move failed or destination exists.', 409);
-        }
-        return ['path' => $relativeTarget];
+        $value = hash_file('sha256', $path);
+        if ($value === false) throw new FileError('Could not compute the checksum.', 500);
+        clearstatcache(true, $path);
+        if (filesize($path) !== $size) throw new FileError('File changed during checksum calculation.', 409);
+        return ['path' => $this->relative($relative), 'algorithm' => 'SHA-256', 'checksum' => $value, 'size' => $size];
     }
 
     public function upload(string $directory, array $file): array
     {
         $name = (string) ($file['name'] ?? '');
         $this->validName($name);
+        if (in_array($file['error'] ?? UPLOAD_ERR_NO_FILE, [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) {
+            throw new FileError('Upload exceeds server size limits.', 413);
+        }
         if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_uploaded_file((string) ($file['tmp_name'] ?? ''))) {
             throw new FileError('Upload was not completed.', 400);
+        }
+        $actualSize = @filesize((string) $file['tmp_name']);
+        if ($actualSize === false || $actualSize > $this->maxUploadBytes) {
+            throw new FileError('Upload exceeds the configured file size limit.', 413);
         }
         $parent = $this->resolve($directory);
         if (!is_dir($parent) || !is_writable($parent)) {

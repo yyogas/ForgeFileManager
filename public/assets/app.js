@@ -21,7 +21,7 @@
     fr: {
       selected: 'sélectionné(s)', none: 'Aucun élément correspondant',
       created: 'Élément créé', saved: 'Fichier enregistré', changed: 'Permissions mises à jour',
-      deleted: 'Élément supprimé', renamed: 'Élément renommé', copied: 'Fichier copié',
+      deleted: 'Élément supprimé', renamed: 'Élément renommé', copied: 'Élément copié',
       moved: 'Élément déplacé', zipped: 'Archive ZIP créée', uploaded: 'Fichier importé',
       cancelled: 'Annuler', confirm: 'Confirmer'
     }
@@ -254,7 +254,8 @@
     for (const btn of $$('.selection-only')) {
       const action = btn.dataset.action;
       let enabled = count === 1 && !!file && file.type !== 'symlink';
-      if (['download','copy'].includes(action)) enabled &&= file?.type === 'file';
+      if (action === 'download') enabled &&= file?.type === 'file';
+      if (action === 'copy' && file?.type === 'directory') enabled &&= !!state.capabilities.copyDirectories;
       if (action === 'zip') enabled &&= !!state.capabilities.zip;
       if (action === 'chmod' && !state.capabilities.chmod) enabled = false;
       if (action === 'extract') enabled = false;
@@ -278,7 +279,7 @@
       ['open','Ouvrir',file.type==='directory'?'folder-open':'eye'],
       ...(file.type==='file'?[['edit','Modifier le fichier','edit'],['download','Télécharger','download']]:[]),
       ['rename','Renommer','edit'],
-      ...(file.type==='file'?[['copy','Copier','copy']]:[]),
+      ...((file.type==='file'||state.capabilities.copyDirectories)?[['copy','Copier','copy']]:[]),
       ['move','Déplacer','move'],['chmod','Permissions CHMOD','shield'],
       ...(state.capabilities.zip?[['zip','Compresser en ZIP','archive']]:[]),
       ['properties','Propriétés','info'], ['sep'],['delete','Supprimer','trash']
@@ -292,6 +293,7 @@
       const btn = document.createElement('button');
       btn.innerHTML = `${icon(symbol)}<span>${escapeHtml(label)}</span>`;
       btn.dataset.action = action;
+      btn.setAttribute('role','menuitem');
       if (file) btn.dataset.path = file.path;
       if (action === 'delete') btn.classList.add('danger');
       menu.appendChild(btn);
@@ -413,7 +415,22 @@
     const div = document.createElement('div');
     const table = [['Nom',file.name],['Chemin',file.path],['Type',typeLabel(file)],['Taille',prettySize(file.size)],['Date de modification',formattedDate(file.modified)],['Permissions',file.mode],['Lisible',file.readable?'Oui':'Non'],['Écriture',file.writable?'Oui':'Non']];
     div.innerHTML = `<table class="perm-table"><tbody>${table.map(([key,val])=>`<tr><td>${escapeHtml(key)}</td><td>${escapeHtml(val)}</td></tr>`).join('')}</tbody></table>`;
-    openModal('Propriétés',div,[{text:'Fermer',run:closeModal}]);
+    const actions=[{text:'Fermer',run:closeModal}];
+    if(file.type==='file' && state.capabilities.checksum) actions.unshift({text:'Calculer SHA-256',className:'btn-primary',run:async()=>{
+      try {
+        const result=await get('checksum',{path:file.path});
+        const row=document.createElement('tr');
+        const label=document.createElement('td'); label.textContent='SHA-256';
+        const value=document.createElement('td');
+        value.textContent=result.checksum;
+        value.style.overflowWrap='anywhere';
+        row.append(label,value);
+        div.querySelector('tbody')?.append(row);
+        $('#modal-actions button')?.setAttribute('disabled','true');
+        toast('Empreinte SHA-256 calculée');
+      } catch(error) { toast(error.message,true); }
+    }});
+    openModal('Propriétés',div,actions);
   }
   function settingsDialog() {
     const content = `<div class="settings-group">
@@ -432,7 +449,7 @@
   function profileDialog() {
     const content = `<p><strong>Compte connecté :</strong> ${escapeHtml(state.username)}</p>
       <p><strong>Racine autorisée :</strong> / (racine du compte, non racine Linux)</p>
-      <p><strong>Version :</strong> 0.1.0-alpha</p>
+      <p><strong>Version :</strong> 0.2.0-alpha</p>
       <p>Cette version utilise une authentification autonome. Les profils revendeurs, le SSO et les quotas par compte sont prévus pour une version ultérieure.</p>`;
     openModal('Mon compte',content,[{text:'Fermer',run:closeModal}],{kicker:'COMPTE HÉBERGEMENT'});
   }
@@ -477,7 +494,7 @@
         });return;
       }
       if (action==='copy'||action==='move'){
-        if(action==='copy'&&file.type!=='file')throw Error('La copie de dossiers est prévue pour une version ultérieure.');
+        if(action==='copy'&&file.type==='directory'&&!state.capabilities.copyDirectories)throw Error('La copie de dossiers est indisponible.');
         promptValue(action==='copy'?'Copier dans un dossier':'Déplacer dans un dossier','Dossier de destination relatif à home (laisser vide pour home)',state.path || '',async directory=>{
           await api(action,{path:file.path,directory:directory==='/'? '':directory});
           toast(action==='copy'?t('copied'):t('moved'));await refresh();
@@ -575,6 +592,9 @@
   $('#modal-backdrop').addEventListener('click',e=>{if(e.target.id==='modal-backdrop') requestCloseModal();});
   $('#upload-picker').addEventListener('change',async e=>{
     for (const file of e.target.files) {
+      if (state.capabilities.maxUploadBytes && file.size > state.capabilities.maxUploadBytes) {
+        toast(`${file.name} : fichier supérieur à la limite de ${prettySize(state.capabilities.maxUploadBytes)}`,true); continue;
+      }
       const form = new FormData();form.append('path',state.path);form.append('file',file);
       try {
         const response=await fetch('/api.php?action=upload',{method:'POST',headers:{'X-CSRF-Token':state.csrf},body:form,credentials:'same-origin'});
@@ -590,6 +610,9 @@
     e.preventDefault();
     if(!e.dataTransfer?.files?.length)return;
     for(const file of e.dataTransfer.files){
+      if (state.capabilities.maxUploadBytes && file.size > state.capabilities.maxUploadBytes) {
+        toast(`${file.name} : fichier supérieur à la limite de ${prettySize(state.capabilities.maxUploadBytes)}`,true);continue;
+      }
       const form=new FormData();form.append('path',state.path);form.append('file',file);
       try{
         const response=await fetch('/api.php?action=upload',{method:'POST',headers:{'X-CSRF-Token':state.csrf},body:form,credentials:'same-origin'});
@@ -600,6 +623,17 @@
     await refresh();
   });
   document.addEventListener('keydown',e=>{
+    if(!$('#context-menu').classList.contains('hidden') && ['ArrowDown','ArrowUp','Home','End'].includes(e.key)) {
+      const buttons=$$('#context-menu button:not(:disabled)');
+      if(buttons.length) {
+        e.preventDefault();
+        const current=buttons.indexOf(document.activeElement);
+        const target=e.key==='Home'?0:e.key==='End'?buttons.length-1:
+          (current+(e.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length;
+        buttons[target].focus();
+      }
+      return;
+    }
     if(e.key==='Escape'){closeMenu();requestCloseModal();$('#sidebar').classList.remove('open');return;}
     if($('#app').classList.contains('hidden'))return;
     const editing=e.target.matches('input,textarea,select,[contenteditable]');

@@ -1,4 +1,4 @@
-# Architecture — v0.1.0-alpha
+# Architecture — v0.2.0-alpha
 
 ## Current composition
 
@@ -32,3 +32,9 @@ Only `public/` may be web exposed. The storage root and application backend sour
 ## Non-goals for alpha
 
 No privileged shell command runner; no direct root filesystem access; no FTP server; no multi-tenant hosting admin control plane; no unattended synchronization or background queue.
+
+## v0.2 bounded filesystem operations
+
+Directory copying is a synchronous, account-local operation. Before writing, the application traverses the source tree to check every path, reject symbolic links/special entries, and enforce hard limits (100 MiB total, 2,000 entries or configured lower threshold, 20 levels). A private randomly named staging path is created in the destination folder, populated, and renamed to the visible target. Failed copies attempt cleanup without following links. Destination name conflicts produce ` (copy)` / ` (copy 2)` names and cannot silently overwrite. These controls are best-effort with PHP pathname APIs and are not resistant to a malicious parallel process running as the same OS identity.
+
+The SHA-256 API only accepts authorized, readable regular files of at most 100 MiB, and returns their checksum and size. It does not sign or attest to file provenance. Upload size is also bounded by a configurable per-file `FFM_UPLOAD_MAX_BYTES` (100 MiB by default), independent of the PHP runtime post/upload limits.

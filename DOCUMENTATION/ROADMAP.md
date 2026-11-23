@@ -14,7 +14,10 @@
 ## P1 — Safe operations
 
 - [ ] Recycle bin and restore with retention limits.
-- [ ] Safe recursive directory copy and move preflight.
+- [x] Bounded directory copy with nested-symlink refusal, staging and preflight; move-into-descendant rejection.
+- [x] Collision-free file/folder duplication.
+- [x] SHA-256 on-demand file integrity check (100 MiB synchronous limit).
+- [x] Per-file upload size policy (server and client).
 - [ ] ZIP extraction with bomb/path/symlink protections.
 - [ ] Bulk selection actions with bounded execution.
 - [ ] Upload quotas, type policies, malware-scan hooks.

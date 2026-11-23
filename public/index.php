@@ -72,7 +72,7 @@ header('Content-Security-Policy: default-src \'self\'; script-src \'self\'; styl
 </div>
 <div id="app" class="app hidden">
   <header class="topbar">
-    <div class="brand"><button class="icon-button mobile-menu" id="mobile-sidebar" aria-label="Ouvrir l'explorateur"><svg class="icon"><use href="#i-list"/></svg></button><span class="brand-icon"><svg class="icon"><use href="#i-folder-open"/></svg></span><span class="brand-name">Forge <strong>File Manager</strong></span><span class="version-tag">ALPHA</span></div>
+    <div class="brand"><button class="icon-button mobile-menu" id="mobile-sidebar" aria-label="Ouvrir l'explorateur"><svg class="icon"><use href="#i-list"/></svg></button><span class="brand-icon"><svg class="icon"><use href="#i-folder-open"/></svg></span><span class="brand-name">Forge <strong>File Manager</strong></span><span class="version-tag">0.2 ALPHA</span></div>
     <div class="topbar-right">
       <span class="topbar-label">Gestionnaire de fichiers</span>
       <button class="icon-button" id="notifications-btn" aria-label="Notifications" title="Notifications"><svg class="icon"><use href="#i-bell"/></svg><span id="notification-dot" class="notification-dot hidden"></span></button>

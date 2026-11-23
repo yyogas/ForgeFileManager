@@ -2,7 +2,7 @@
 
 **A modern, account-scoped PHP file manager for web hosting environments.**
 
-> **Status:** `v0.1.0-alpha` — an original, testable **UI + secure-core foundation**. Not production-ready. Not yet a replacement for cPanel File Manager. This repository has **not** imported the external `filemanager-master` distribution because `https://download.wcp360.com/?dir=filemanager-master` could not be retrieved during this development pass. An audited upstream import/migration remains pending; no upstream source code or provenance is falsely claimed.
+> **Status:** `v0.2.0-alpha` — an original, testable **UI + secure-core foundation**. Not production-ready. Not yet a replacement for cPanel File Manager. This repository has **not** imported the external `filemanager-master` distribution because `https://download.wcp360.com/?dir=filemanager-master` could not be retrieved during this development pass. An audited upstream import/migration remains pending; no upstream source code or provenance is falsely claimed.
 
 Forge File Manager is designed to provide a clean, responsive file-management experience for hosting users while enforcing access through a configured hosting-account filesystem root. The current implementation uses native PHP 8.2+, framework-free JavaScript and CSS with no runtime CDN dependency.
 
@@ -41,12 +41,15 @@ The username in the top-right header is returned by the authenticated server ses
 | Context menu | Right-click actions for file, folder and empty background; per-row action button for touch devices |
 | CHMOD | Interactive owner/group/other matrix, live octal and symbolic display, explicit server-side policy |
 | Editor | UTF-8 text editor with CTRL/CMD+S and optimistic SHA-256 conflict checks, 1 MB default limit |
-| Transfers | Authenticated file upload and attachment download; no overwrites |
+| Transfers | Authenticated file upload with configurable maximum (100 MiB default), attachment download; no overwrites |
 | ZIP | Archive a file or directory if `ext-zip` is present; 100 MB uncompressed directory limit, depth and item-count limits |
+| Folder copy | Bounded recursive copies (max 100 MiB / 2,000 items / 20 levels), no symlinks, temporary private staging and best-effort rollback |
+| File integrity | On-demand SHA-256 checksum in the Properties dialog for readable regular files up to 100 MiB |
+| Context menu accessibility | Arrow Up / Down, Home, End navigation and menuitem semantics (browser acceptance still required) |
 | Interface | Flat responsive design, dark/light mode, density options, notification toasts, keyboard shortcuts |
 | Testing | PHP filesystem tests and authenticated HTTP smoke tests |
 
-**Not implemented yet:** full folder copy, recursive delete, safe extraction, recycle bin, file versioning, ACL management, advanced syntax highlighting, multi-tenant SSO, quota enforcement, background transfers, resumable chunks, external storage, search indexing, fully localized UI, developer terminal, and plugin SDK. Buttons for unavailable operations are disabled or absent. The UI shows server disk usage **as server volume usage, not as an account quota**.
+**Not implemented yet:** recursive delete, safe extraction, recycle bin, file versioning, ACL management, advanced syntax highlighting, multi-tenant SSO, quota enforcement, background transfers, resumable chunks, external storage, search indexing, fully localized UI, developer terminal, and plugin SDK. Buttons for unavailable operations are disabled or absent. The UI shows server disk usage **as server volume usage, not as an account quota**.
 
 ## Requirements
 
@@ -88,6 +91,7 @@ php -S 127.0.0.1:8080 -t public public/router.php
 | `FFM_STORAGE_ROOT` | Yes | Existing, account-owned filesystem root, never `/` |
 | `FFM_EDITOR_MAX_BYTES` | No | Max editor file size, default `1048576` bytes |
 | `FFM_MAX_ENTRIES` | No | Max results per listed directory, default `2000` |
+| `FFM_UPLOAD_MAX_BYTES` | No | Max upload file size, default `104857600` bytes |
 | `FFM_ALLOW_WORLD_WRITABLE` | No | `0` by default; blocks modes granting write to others |
 | `FFM_ALLOW_HTTP_DEV` | No | Must be `0`/unset in production; only for local development |
 | `FFM_ALLOW_ROOT_DEV` | No | Must remain `0`/unset in production; root worker prohibited |
@@ -100,7 +104,9 @@ See `.env.example`. This is a **reference list**, not an automatically loaded `.
 - A `..`, absolute path, invalid path component, or symlink traversal is rejected.
 - Changing mode on the account root is blocked; **CHMOD applies only to the selected file/folder** (no recursive changes yet).
 - Deletion is permanent in this alpha and requires confirmation. Directory removal works only for empty folders.
-- Uploads reject an existing destination rather than overwrite it.
+- Uploads reject an existing destination rather than overwrite it. File size is bounded by `FFM_UPLOAD_MAX_BYTES` (default 100 MiB) in addition to PHP `upload_max_filesize` and `post_max_size`.
+- Copying a directory performs a preflight and stages a bounded tree. Copying into the same directory produces names such as `directory (copy)`; no overwrites are allowed.
+- The checksum endpoint returns a SHA-256 digest for files up to 100 MiB; it is a best-effort snapshot and is not a signed provenance proof.
 - Text editing accepts UTF-8 files without NUL bytes; files larger than configured limits are rejected.
 - Cross-tenant filesystem security depends on correct OS-level isolation. PHP-level path checks alone are not a secure boundary against hostile concurrent processes and symlink races.
 
@@ -122,6 +128,7 @@ See `.env.example`. This is a **reference list**, not an automatically loaded `.
 
 ```bash
 php tests/filesystem.php
+php tests/advanced-operations.php
 bash tests/http-smoke.sh
 node --check public/assets/app.js
 find src public bin tests -name '*.php' -print0 | xargs -0 -n1 php -l

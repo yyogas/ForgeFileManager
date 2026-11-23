@@ -13,16 +13,19 @@ Legend: `VERIFIED` (tested), `IMPLEMENTED` (code exists; not independently brows
 | Right-click context menu | IMPLEMENTED | File/folder/blank context |
 | Mobile per-row action button | IMPLEMENTED | Responsive CSS |
 | Folder listing, navigation, path restrictions | VERIFIED | PHP tests / HTTP smoke |
+| SHA-256 checksum | VERIFIED (HTTP) | File properties action, 100 MiB limit, regression tests |
+| Duplicate file/folder names | VERIFIED | ` (copy)` and numbered collision-free variants |
+| Context menu keyboard arrows | IMPLEMENTED | Browser/AT audit pending |
 | Grid/list/sort/current-folder filter | IMPLEMENTED | No browser confirmation |
 | Create, rename, move and file copy | VERIFIED | PHP tests |
-| File upload | IMPLEMENTED | Browser upload not tested |
+| File upload | VERIFIED (HTTP) | Per-file limit enforced server-side; browser flow not tested |
 | Download file | IMPLEMENTED | Attachment headers |
 | UTF-8 edit and conflict check | VERIFIED | PHP tests |
 | CHMOD matrix | IMPLEMENTED | JS matrix, PHP backend verified |
 | World-writable CHMOD policy | VERIFIED | PHP tests |
 | ZIP archive generation | PARTIAL | Implemented, ext-zip missing in local runtime |
 | ZIP extraction | PLANNED | Disabled until security audit |
-| Full directory copy | PLANNED | API returns 422 |
+| Full directory copy | VERIFIED | Preflight limits and nested-symlink rejection, 21 advanced regression tests + HTTP smoke |
 | Recursive delete | BLOCKED | Intentionally disabled to prevent irreversible mass deletion |
 | Trash / versioning | PLANNED | Not implemented |
 | ACL/chown | PLANNED | Not implemented |

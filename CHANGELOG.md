@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.2.0-alpha — 2026-11-23
+
+### Added
+- Bounded directory copy with 100 MiB content limit, 2,000 entry limit and 20 level depth limit.
+- Refusal of nested symlinks, self-copy and copy into descendants; best-effort staging rollback.
+- Collision-safe file and folder duplicates with numbered suffixes.
+- SHA-256 checksum API and on-demand action from file Properties.
+- Configurable per-file upload size policy (`FFM_UPLOAD_MAX_BYTES`) and browser preflight warning.
+- Keyboard arrow/Home/End navigation for contextual action menus.
+- 21 new filesystem regression assertions and expanded authenticated HTTP smoke tests.
+
+### Outstanding
+- Browser E2E and assistive technology validation are pending.
+- The original `filemanager-master` upstream content remains inaccessible and has not been imported.
+- No ZIP extraction, recycle bin, hosting-panel SSO, per-account quotas or production security sign-off.
+
 ## 0.1.0-alpha — 2026-11-23
 
 ### Added

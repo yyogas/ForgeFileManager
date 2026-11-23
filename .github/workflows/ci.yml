@@ -19,6 +19,8 @@ jobs:
         run: find src public bin tests -name '*.php' -print0 | xargs -0 -n1 php -l
       - name: Filesystem regression suite
         run: php tests/filesystem.php
+      - name: Advanced filesystem operations suite
+        run: php tests/advanced-operations.php
       - name: Authenticated HTTP smoke suite
         run: bash tests/http-smoke.sh
       - name: JavaScript syntax validation

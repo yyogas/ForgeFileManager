@@ -32,3 +32,7 @@ Modals use an accessible dialog role and Escape-to-close. New folder/new file/re
 ## Responsive
 
 On narrow screens the toolbar prioritizes icons, the sidebar becomes a drawer, and less important file columns disappear. Keyboard access and accessible focus states are included; formal mobile/touch and screen-reader tests remain required.
+
+## v0.2 contextual UX
+
+The Copy action supports files and folders when `me.capabilities.copyDirectories` is true. The action prompts for a destination relative to the hosting home and communicates naming conflicts through automatic ` (copy)` suffixes. Properties for regular files include an opt-in SHA-256 action; hashing is not automatic. Upload drag/drop and picker display a local size warning, but server policy is authoritative. Context menus expose `menuitem` semantics with Arrow Up/Down/Home/End keyboard traversal. Focus trapping and a full WCAG screen-reader audit are still outstanding.

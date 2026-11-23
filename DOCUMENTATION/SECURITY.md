@@ -42,3 +42,9 @@
 ## Provenance and license
 
 No source from the inaccessible external directory has been copied. No license from that upstream distribution is implied. Inspect upstream `LICENSE`, bundled vendors and authorship before importing or relicensing code.
+
+## v0.2 limits and residual risks
+
+Copying directory trees refuses symlinks, files larger than an aggregate 100 MiB, paths deeper than 20 levels, and more than 2,000 entries (or a stricter configured listing limit). An isolated staging tree is used for best-effort cleanup after errors. These checks are not race-free against an adversary with filesystem write privileges; a future lower-level OS adapter must use descriptor-relative, no-follow APIs for a stronger guarantee.
+
+SHA-256 checksum requests require normal authenticated GET access, regular readable files, and a 100 MiB limit. Uploads are bounded by `FFM_UPLOAD_MAX_BYTES` (default 100 MiB) and by PHP transport-level limits; a client-side check is informational only. No malware detection, storage quota enforcement, or per-IP brute-force protection is claimed. Production deployment still requires independent security assessment.

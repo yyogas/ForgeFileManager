@@ -95,17 +95,22 @@ final class Http
             $fs = new Filesystem(
                 $storageRoot,
                 (int) (getenv('FFM_EDITOR_MAX_BYTES') ?: 1048576),
-                (int) (getenv('FFM_MAX_ENTRIES') ?: 2000)
+                (int) (getenv('FFM_MAX_ENTRIES') ?: 2000),
+                (int) (getenv('FFM_UPLOAD_MAX_BYTES') ?: 104857600)
             );
             if ($method === 'GET') {
                 if ($action === 'me') {
-                    self::json(['ok' => true, 'username' => $username, 'csrf' => $_SESSION['csrf'], 'version' => '0.1.0-alpha', 'capabilities' => [
+                    self::json(['ok' => true, 'username' => $username, 'csrf' => $_SESSION['csrf'], 'version' => '0.2.0-alpha', 'capabilities' => [
                         'chmod' => true, 'upload' => true, 'zip' => class_exists(\ZipArchive::class),
-                        'zipExtract' => false, 'trash' => false, 'copyDirectories' => false,
+                        'zipExtract' => false, 'trash' => false, 'copyDirectories' => true, 'checksum' => true,
+                        'maxUploadBytes' => $fs->maxUploadBytes(),
                     ]]);
                 }
                 if ($action === 'list') {
                     self::json(['ok' => true, 'data' => $fs->listing(self::getString('path'))]);
+                }
+                if ($action === 'checksum') {
+                    self::json(['ok' => true, 'data' => $fs->checksum(self::getString('path'))]);
                 }
                 if ($action === 'read') {
                     self::json(['ok' => true, 'data' => $fs->readText(self::getString('path'))]);
