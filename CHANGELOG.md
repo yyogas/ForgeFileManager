@@ -10,6 +10,7 @@
 - Create ZIPs via constrained private staging, without overwrites.
 - Restore validated file/directory timestamps during safe ZIP extraction.
 - Add PHP and HTTP regressions for isolation, editor, CHMOD, timestamps and archives.
+- Verify file handles and path inode before reading/downloading/previewing/checksumming.
 - Require ext-zip within GitHub CI, so ZIP tests cannot silently skip.
 
 ### Known limitations
