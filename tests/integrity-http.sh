@@ -40,6 +40,14 @@ php -r '$d=json_decode(file_get_contents($argv[1]),true);if(($d["data"]["mode"]?
 code="$(curl -sS -b "$work/cookies" -o "$work/stale" -w '%{http_code}' -H "X-CSRF-Token: $csrf" -H 'Content-Type: application/json' --data-binary "@$work/save.json" "$base?action=save")"
 [[ "$code" == 409 ]] || { echo "Stale edit returned $code"; exit 1; }
 echo 'PASS: bounded edit, optimistic conflict, preserved mode, modified timestamp'
+curl -fsS -b "$work/cookies" "$base?action=download&path=readme.txt" > "$work/download.txt"
+[[ "$(cat "$work/download.txt")" == 'updated contents' ]]
+curl -fsS -b "$work/cookies" "$base?action=checksum&path=readme.txt" > "$work/checksum.json"
+php -r '$d=json_decode(file_get_contents($argv[1]),true);if(($d["data"]["checksum"]??null)!==hash("sha256","updated contents"))exit(1);' "$work/checksum.json"
+printf '%s' 'R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==' | base64 -d > "$root/thumbnail.gif"
+curl -fsS -b "$work/cookies" "$base?action=preview&path=thumbnail.gif" > "$work/preview.gif"
+cmp "$root/thumbnail.gif" "$work/preview.gif"
+echo 'PASS: verified-handle download, checksum and image preview'
 curl -fsS -b "$work/cookies" -H "X-CSRF-Token: $csrf" -H 'Content-Type: application/json' \
  -d '{"path":"readme.txt","mode":"604"}' "$base?action=chmod" > "$work/chmod.json"
 [[ "$(stat -c %a "$root/readme.txt")" == '604' ]]
