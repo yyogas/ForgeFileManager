@@ -15,8 +15,8 @@ header('Content-Security-Policy: default-src \'self\'; script-src \'self\'; styl
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#ffffff">
   <title>Forge File Manager</title>
-  <link rel="stylesheet" href="assets/app.css?v=0.2.2">
-  <script src="assets/app.js?v=0.2.2" defer></script>
+  <link rel="stylesheet" href="assets/app.css?v=0.2.3">
+  <script src="assets/app.js?v=0.2.3" defer></script>
 </head>
 <body>
 <svg class="svg-icons" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -71,7 +71,7 @@ header('Content-Security-Policy: default-src \'self\'; script-src \'self\'; styl
     <p>Accédez aux fichiers autorisés de votre compte d'hébergement.</p>
     <label class="language-choice"><span>Langue</span><select id="login-language" aria-label="Langue"><option value="en">English</option><option value="fr">Français</option></select></label>
     <?php if ($demoMode): ?>
-    <div class="demo-login-note"><strong>Mode démonstration — lecture seule</strong><p>Identifiants de démonstration : demo / demo123</p><small>Aucun fichier réel du serveur ne peut être consulté ou modifié.</small></div>
+    <div class="login-credentials"><strong>Identifiants de connexion</strong><p><span>Utilisateur :</span> <code>demo</code> <span>Mot de passe :</span> <code>demo123</code></p><small>Accès aux fichiers d’exemple uniquement ; aucune modification des fichiers réels.</small></div>
     <?php endif; ?>
     <form id="login-form">
       <label for="login-username">Identifiant</label><input id="login-username" name="username" autocomplete="username" <?php if ($demoMode): ?>value="demo"<?php endif; ?> required>
@@ -84,9 +84,8 @@ header('Content-Security-Policy: default-src \'self\'; script-src \'self\'; styl
 </div>
 <div id="app" class="app hidden">
   <header class="topbar">
-    <div class="brand"><button class="icon-button mobile-menu" id="mobile-sidebar" aria-label="Ouvrir l'explorateur"><svg class="icon"><use href="#i-list"/></svg></button><span class="brand-icon"><svg class="icon"><use href="#i-folder-open"/></svg></span><span class="brand-name">Forge <strong>File Manager</strong></span><span class="version-tag">0.2.2 ALPHA</span></div>
+    <div class="brand"><span class="brand-icon"><svg class="icon"><use href="#i-folder-open"/></svg></span><span class="brand-name">Forge <strong>File Manager</strong></span><span class="version-tag">0.2.3 ALPHA</span></div>
     <div class="topbar-right">
-      <span class="demo-mode-flag hidden" id="demo-mode-flag">Mode démonstration — lecture seule</span>
       <label class="language-choice header-language"><span class="sr-only">Langue</span><select id="header-language" aria-label="Langue"><option value="en">English</option><option value="fr">Français</option></select></label>
       <span class="topbar-label">Gestionnaire de fichiers</span>
       <button class="icon-button" id="notifications-btn" aria-label="Notifications" title="Notifications"><svg class="icon"><use href="#i-bell"/></svg><span id="notification-dot" class="notification-dot hidden"></span></button>
@@ -117,28 +116,16 @@ header('Content-Security-Policy: default-src \'self\'; script-src \'self\'; styl
       <button class="tool selection-only toolbar-extra" data-action="zip" title="Compresser en ZIP"><svg class="icon"><use href="#i-archive"/></svg> <span>ZIP</span></button>
       <button class="tool selection-only toolbar-extra" data-action="extract" disabled title="Extraction sécurisée prévue après audit"><svg class="icon"><use href="#i-archive"/></svg> <span>Extraire</span></button>
       <button class="tool selection-only danger toolbar-extra" data-action="delete" title="Supprimer un fichier ou dossier vide"><svg class="icon"><use href="#i-trash"/></svg> <span>Supprimer</span></button>
+      <span class="tool-divider"></span>
+      <button class="tool" data-action="refresh" title="Actualiser"><svg class="icon"><use href="#i-refresh"/></svg><span class="hide-sm">Actualiser</span></button>
     </div>
-    <div class="toolbar-end"><button class="tool" data-action="refresh" title="Actualiser"><svg class="icon"><use href="#i-refresh"/></svg><span class="hide-sm">Actualiser</span></button></div>
   </section>
   <div class="workspace">
-    <aside class="sidebar" id="sidebar">
-      <div class="sidebar-section-heading">NAVIGATION</div>
-      <button class="side-link active" data-nav=""><svg class="icon"><use href="#i-home"/></svg><span>Accueil</span></button>
-      <div class="sidebar-section-heading sidebar-heading-with-action">DOSSIERS <button class="small-icon" id="sidebar-refresh" aria-label="Actualiser les dossiers"><svg class="icon"><use href="#i-refresh"/></svg></button></div>
-      <div id="folder-tree" class="folder-tree"></div>
-      <div class="sidebar-bottom">
-        <div class="disk-title"><svg class="icon"><use href="#i-hard-drive"/></svg> Espace disque serveur</div>
-        <div class="storage-meter"><span id="disk-progress"></span></div>
-        <div class="disk-numbers" id="disk-numbers">Calcul en cours…</div>
-        <small>Volume du serveur, pas quota du compte</small>
-      </div>
-    </aside>
     <main class="main-panel">
-      <div class="panel-heading">
-        <div><div class="eyebrow">EXPLORATEUR DE FICHIERS</div><h1>Mes fichiers</h1></div>
+      <div class="location-bar">
+        <nav id="breadcrumbs" class="breadcrumbs" aria-label="Emplacement actuel"></nav>
         <div class="panel-controls"><button class="view-button selected" id="list-view" title="Vue liste" aria-label="Vue liste"><svg class="icon"><use href="#i-list"/></svg></button><button class="view-button" id="grid-view" title="Vue grille" aria-label="Vue grille"><svg class="icon"><use href="#i-grid"/></svg></button></div>
       </div>
-      <nav id="breadcrumbs" class="breadcrumbs" aria-label="Emplacement actuel"></nav>
       <div class="list-tools">
         <div class="search-field"><svg class="icon"><use href="#i-search"/></svg><input type="search" id="file-search" placeholder="Rechercher dans ce dossier…" aria-label="Filtrer les fichiers du dossier"></div>
         <label class="hidden-switch" title="Afficher les fichiers cachés"><input type="checkbox" id="show-hidden"><span>Fichiers cachés</span></label>
@@ -150,9 +137,17 @@ header('Content-Security-Policy: default-src \'self\'; script-src \'self\'; styl
         <div class="file-grid hidden" id="file-grid"></div>
         <div id="empty-state" class="empty-state hidden"><svg class="icon"><use href="#i-folder-open"/></svg><strong>Dossier vide</strong><span>Créez un fichier, un dossier ou importez vos documents.</span></div>
       </div>
+      <nav id="pagination" class="pagination" aria-label="Pagination des fichiers">
+        <span class="pagination-summary" id="pagination-summary" aria-live="polite">0 élément</span>
+        <div id="pagination-buttons" class="pagination-buttons"></div>
+      </nav>
     </main>
   </div>
-  <footer class="statusbar"><span id="status-path">/</span><span id="status-count">0 élément</span><span class="status-right"><span class="status-dot"></span><span id="status-service">Connecté</span></span></footer>
+  <footer class="statusbar">
+    <div class="status-files"><span id="status-path">/</span><span id="status-count">0 élément</span></div>
+    <div class="status-disk"><svg class="icon" aria-hidden="true"><use href="#i-hard-drive"/></svg><div class="disk-meta"><strong>Espace disque serveur</strong><span id="disk-numbers">Indisponible</span><small>Volume du serveur, pas quota du compte</small></div><div class="storage-meter" aria-hidden="true"><span id="disk-progress"></span></div></div>
+    <span class="status-right"><span class="status-dot"></span><span id="status-service">Connecté</span></span>
+  </footer>
 </div>
 <input type="file" id="upload-picker" multiple class="hidden">
 <div class="context-menu hidden" id="context-menu" role="menu"></div>

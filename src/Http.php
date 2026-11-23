@@ -107,7 +107,7 @@ final class Http
                 // an unsafe storage root is supplied in the environment.
                 if ($method === 'GET' && $action === 'me') {
                     self::json(['ok' => true, 'username' => 'demo', 'csrf' => $_SESSION['csrf'],
-                        'version' => '0.2.2-alpha', 'demo' => true,
+                        'version' => '0.2.3-alpha', 'demo' => true,
                         'capabilities' => ['demo' => true, 'readOnly' => true, 'chmod' => false,
                             'upload' => false, 'zip' => false, 'zipExtract' => false, 'trash' => false,
                             'copyDirectories' => false, 'checksum' => true, 'maxUploadBytes' => 0]]);
@@ -136,7 +136,7 @@ final class Http
             );
             if ($method === 'GET') {
                 if ($action === 'me') {
-                    self::json(['ok' => true, 'username' => $username, 'csrf' => $_SESSION['csrf'], 'version' => '0.2.2-alpha', 'capabilities' => [
+                    self::json(['ok' => true, 'username' => $username, 'csrf' => $_SESSION['csrf'], 'version' => '0.2.3-alpha', 'capabilities' => [
                         'chmod' => true, 'upload' => true, 'zip' => class_exists(\ZipArchive::class),
                         'zipExtract' => false, 'trash' => false, 'copyDirectories' => true, 'checksum' => true,
                         'maxUploadBytes' => $fs->maxUploadBytes(),

@@ -167,5 +167,16 @@
   "Supprimer définitivement « {file} » ? Les dossiers non vides ne peuvent pas être supprimés. Cette version ne possède pas encore de corbeille.": "Permanently delete “{file}”? Non-empty folders cannot be deleted. This version does not have a recycle bin.",
   "{name} : fichier supérieur à la limite de {max}": "{name}: file exceeds the {max} limit",
   "Fichier importé": "File uploaded",
-  "Fichier supérieur à la limite": "File exceeds the limit"
+  "Fichier supérieur à la limite": "File exceeds the limit",
+  "Éléments {first}–{last} sur {total}": "Items {first}–{last} of {total}",
+  "Page {page} active": "Page {page}, current",
+  "Page {page}": "Page {page}",
+  "Identifiants de connexion": "Sign-in credentials",
+  "Utilisateur :": "Username:",
+  "Mot de passe :": "Password:",
+  "Accès aux fichiers d’exemple uniquement ; aucune modification des fichiers réels.": "Sample files only; no changes to real server files.",
+  "Cet accès aux fichiers d’exemple est en lecture seule.": "This sample-file access is read-only.",
+  "Pagination des fichiers": "File pagination",
+  "Page précédente": "Previous page",
+  "Page suivante": "Next page"
 }

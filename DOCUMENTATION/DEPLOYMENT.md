@@ -1,4 +1,4 @@
-# Deployment and troubleshooting — v0.2.2-alpha
+# Deployment and troubleshooting — v0.2.3-alpha
 
 ## Security requirement (not optional)
 

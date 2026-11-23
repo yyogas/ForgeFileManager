@@ -47,8 +47,8 @@ with tempfile.TemporaryDirectory(prefix='ffm-browser-') as tmp:
             assert page.locator('#file-rows tr').count() == 3
             print('PASS: login, account header, initial file list')
             page.screenshot(path=str(PROJECT/'preview.png'),full_page=True)
-            # Sidebar navigation and context menu
-            page.locator('[data-nav="public_html"]').first.click()
+            # Breadcrumb navigation (the sidebar has been removed) and context menu
+            page.get_by_role('button',name='public_html').first.dblclick()
             page.get_by_role('button',name='index.php').first.click(button='right')
             assert 'Permissions CHMOD' in page.locator('#context-menu').inner_text()
             page.locator('#context-menu button[data-action="chmod"]').click()

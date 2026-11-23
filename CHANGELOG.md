@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.2.3-alpha — 2026-11-23
+
+### Layout and interaction
+- Removed sidebar and redundant explorer titles. Navigation remains available via breadcrumbs.
+- Centered main action toolbar and kept mobile horizontal scroll.
+- Moved server disk usage, unavailable fallback, and server-volume disclaimer to the footer.
+- Added vertical file-list scroll, sticky table headers, and client-side 25-item pagination for list/grid with accessible previous/next, numbered pages and range summary.
+- Search and sort reset pagination; page changes clear selection; selecting all applies only to the current page.
+- Removed visual demonstration banner but preserved the visible `demo / demo123` sample credentials at unconfigured sign-in, with server-side virtual read-only isolation intact.
+- Updated English/French catalogs, browser tests and UI documentation.
+
+### Known limitation
+- PHP listing still caps directory results at `FFM_MAX_ENTRIES` (default 2,000); true server pagination remains planned.
+
+
 ## 0.2.2-alpha — 2026-11-23
 
 ### Added

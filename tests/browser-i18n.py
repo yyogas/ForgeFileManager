@@ -38,13 +38,15 @@ with sync_playwright() as p:
     assert page.locator('#login-password').input_value()=='demo123'
     page.locator('#login-form button[type=submit]').click()
     page.locator('#app:not(.hidden)').wait_for(timeout=5000)
-    assert page.locator('.panel-heading h1').inner_text()=='My files',page.locator('.panel-heading h1').inner_text()
+    assert page.locator('.sidebar').count()==0
+    assert page.locator('.panel-heading h1').count()==0
+    assert page.locator('.status-disk').is_visible()
     assert page.locator('#account-name').inner_text()=='demo'
-    assert page.locator('#demo-mode-flag').is_visible()
+    assert page.locator('#demo-mode-flag').count()==0
     assert page.locator('[data-action="new-folder"]').is_disabled()
     page.locator('#header-language').select_option('fr')
-    page.wait_for_function("document.querySelector('.panel-heading h1').textContent==='Mes fichiers'")
+    page.wait_for_function("document.querySelector('.disk-meta strong').textContent==='Espace disque serveur'")
     page.locator('#header-language').select_option('en')
-    page.wait_for_function("document.querySelector('.panel-heading h1').textContent==='My files'")
-    print('PASS: Offline Chromium: demo login, English/French toggle, read-only toolbar')
+    page.wait_for_function("document.querySelector('.disk-meta strong').textContent==='Server disk usage'")
+    print('PASS: Offline Chromium: demo credentials, no sidebar, footer disk, English/French toggle, read-only toolbar')
     browser.close()

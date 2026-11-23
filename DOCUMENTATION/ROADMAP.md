@@ -48,3 +48,16 @@
 - [ ] Search and indexing engine with tenant-bound results.
 
 Each checkbox is an engineering work item, not a product promise. Publish only tested capabilities in releases.
+
+## v0.2.3 UX pass — implemented
+
+- Single-column full-width explorer, no sidebar or redundant heading.
+- Centered primary toolbar; compact horizontal scroll on small screens.
+- File list scrollbar and sticky table headers.
+- Page navigation controls with 25 items max for list/grid, and page reset on filters.
+- Server disk usage moved to footer and labeled separately from account quota.
+- Only sample sign-in information remains; no demo-mode banner. Public test access remains restricted server-side.
+
+## Next: server-side pagination
+
+Current responses remain capped by `FFM_MAX_ENTRIES=2000` by default. Introduce validated, paginated and sorted API contracts for very large directories and avoid eager transfer of thousands of metadata objects. Include concurrency, renames during paging, and search/index behavior tests.

@@ -46,3 +46,19 @@ Legend: `VERIFIED` (tested), `IMPLEMENTED` (code exists; not independently brows
 | English and French catalog delivery | VERIFIED | HTTP tests and JSON validation |
 | English default UI and language switch | VERIFIED locally | Offline Chromium UI exercise |
 | Full localization of PHP error messages | PLANNED | Server errors currently returned in English |
+
+## v0.2.3-alpha: layout and paging
+
+| Feature | Status | Evidence / limitation |
+| --- | --- | --- |
+| Sidebar and redundant explorer titles removed | VERIFIED locally | HTML checks and offline Chromium |
+| Header user, centered action sub-header | VERIFIED locally | Offline Chromium geometry check |
+| Footer server disk usage and unavailable fallback | VERIFIED locally | Offline Chromium English/French checks |
+| Vertical file-list scroll | VERIFIED locally | Browser computed CSS and scroll region |
+| 25 visible items per page | VERIFIED locally | Browser fixture with 61 entries (25 / 25 / 11) |
+| Pagination in list and grid modes | VERIFIED locally | Browser fixture |
+| Reset page on search / sorting and directory navigation | IMPLEMENTED | Browser search verified; automated smoke for sorting planned |
+| Selection limited to currently visible page | VERIFIED locally | Browser fixture; selection cleared on page navigation |
+| Public sample username/password still displayed, no demo banner | VERIFIED locally | Browser UI checks |
+| Public sample access restricted to virtual read-only files | VERIFIED | Existing HTTP security checks |
+| Server-side pagination beyond `FFM_MAX_ENTRIES` | PLANNED | Existing API still caps responses at 2,000 entries by default |

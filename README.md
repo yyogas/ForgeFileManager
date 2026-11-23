@@ -2,29 +2,29 @@
 
 **A modern, account-scoped PHP file manager for web hosting environments.**
 
-> **Status:** `v0.2.2-alpha` — an original, testable **UI + secure-core foundation**. Not production-ready. Not yet a replacement for cPanel File Manager. This repository has **not** imported the external `filemanager-master` distribution because `https://download.wcp360.com/?dir=filemanager-master` could not be retrieved during this development pass. An audited upstream import/migration remains pending; no upstream source code or provenance is falsely claimed.
+> **Status:** `v0.2.3-alpha` — an original, testable **UI + secure-core foundation**. Not production-ready. Not yet a replacement for cPanel File Manager. This repository has **not** imported the external `filemanager-master` distribution because `https://download.wcp360.com/?dir=filemanager-master` could not be retrieved during this development pass. An audited upstream import/migration remains pending; no upstream source code or provenance is falsely claimed.
 
 Forge File Manager is designed to provide a clean, responsive file-management experience for hosting users while enforcing access through a configured hosting-account filesystem root. The current implementation uses native PHP 8.2+, framework-free JavaScript and CSS with no runtime CDN dependency.
 
 ## UI preview: product structure
 
 ```text
-┌──────────────────────────────────────────────────────────────────────────────┐
-│  [▣] Forge File Manager                 [Notifications] [Settings] [USER ▾] │
-├──────────────────────────────────────────────────────────────────────────────┤
-│ [+ Folder] [+ File] [Upload] [Download] [Copy] [Move] [Rename] [CHMOD] [ZIP]│
-├───────────────┬──────────────────────────────────────────────────────────────┤
-│ Navigation    │ My files                                      [List] [Grid] │
-│  Home         │ home  >  public_html                                          │
-│  Folders      │ [Search within directory...]   [Hidden]  [Sort]             │
-│   public_html │ □ Name           Type       Size       Modified      CHMOD   │
-│   logs        │ □ assets         Directory     —         ...          755   │
-│   backups     │ □ index.php      PHP         ...        ...          644   │
-│               │                                                              │
-│ Server volume │ Right-click any item to open its contextual actions.        │
-├───────────────┴──────────────────────────────────────────────────────────────┤
-│ /public_html                   3 items                             ● Online │
-└──────────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────┐
+│ Forge File Manager                  [Language] [Settings] [USER ▾]        │
+├────────────────────────────────────────────────────────────────────────────┤
+│          [+ Folder] [+ File] [Upload] [Copy] [Move] [CHMOD] [Refresh]     │
+├────────────────────────────────────────────────────────────────────────────┤
+│ home > public_html                                       [List] [Grid]  │
+│ [Search within this folder...]  [Hidden files]  [Sort]                   │
+│ □ Name              Type        Size      Modified       CHMOD  Actions   │
+│ □ assets            Directory   —         ...            755     ⋯       │
+│ □ index.php         PHP         ...       ...            644     ⋯       │
+│                          ⇵ vertically scrollable file area              │
+│ Items 1–25 of 61                            [‹] [1] [2] [3] [›]          │
+├────────────────────────────────────────────────────────────────────────────┤
+│ /public_html   61 items       Server disk usage: Unavailable  ● Online    │
+│                                Server volume, not account quota          │
+└────────────────────────────────────────────────────────────────────────────┘
 ```
 
 The username in the top-right header is returned by the authenticated server session, **not** a hard-coded demo string. The top bar contains working account, settings, notifications and logout menus. The second header prioritizes core file operations.
@@ -35,7 +35,7 @@ The username in the top-right header is returned by the authenticated server ses
 | --- | --- |
 | Authentication | Password-hash verification and session for live accounts; virtual read-only demo uses `demo / demo123` when no live account is configured |
 | Security | CSRF on mutations, scoped storage root, path-segment and symlink rejection, HTTPS required except explicit development setting |
-| Navigation | Directory browser, breadcrumbs, root-folder sidebar, list/grid switch, search current directory, hidden-file toggle, sorting |
+| Navigation | Full-width directory browser with breadcrumbs (no sidebar), list/grid, current-folder search, hidden-file toggle, sorting |
 | Header | Dynamic account username, profile dropdown, preferences, notifications |
 | Action toolbar | Create file/folder, multi-file upload, single-file download, copy single file, move, rename, CHMOD, ZIP if extension available, refresh, delete |
 | Context menu | Right-click actions for file, folder and empty background; per-row action button for touch devices |
@@ -46,9 +46,11 @@ The username in the top-right header is returned by the authenticated server ses
 | Folder copy | Bounded recursive copies (max 100 MiB / 2,000 items / 20 levels), no symlinks, temporary private staging and best-effort rollback |
 | File integrity | On-demand SHA-256 checksum in the Properties dialog for readable regular files up to 100 MiB |
 | Context menu accessibility | Arrow Up / Down, Home, End navigation and menuitem semantics (browser acceptance still required) |
-| Interface | Flat responsive design, dark/light mode, density options, notification toasts, keyboard shortcuts; bilingual English/French UI |
-| Demo | Automatic virtual read-only sandbox when all live credentials are absent; demo cannot view or modify server files |
+| Interface | Flat responsive design, centered action sub-header, up to 25 entries per page, numbered pagination and vertically scrollable file area; dark/light mode, density options, bilingual English/French UI |
+| Sample login | `demo / demo123` remains displayed only on the unconfigured sign-in page; there is no banner in the file manager. The backend still isolates this public access to read-only synthetic files. |
 | Testing | PHP filesystem tests and authenticated HTTP smoke tests |
+
+**Pagination note:** The UI displays at most **25 files/folders** per page, in both list and grid modes. Pagination follows current-folder filtering and sorting, and page changes clear the selection. The existing PHP listing API still caps a directory response at `FFM_MAX_ENTRIES` (default 2,000): full server-side pagination for extremely large directories remains future work.
 
 **Not implemented yet:** recursive delete, safe extraction, recycle bin, file versioning, ACL management, advanced syntax highlighting, multi-tenant SSO, quota enforcement, background transfers, resumable chunks, external storage, search indexing, localization of remaining server errors, developer terminal, and plugin SDK. Buttons for unavailable operations are disabled or absent. The UI shows server disk usage **as server volume usage, not as an account quota**.
 
@@ -62,10 +64,10 @@ The username in the top-right header is returned by the authenticated server ses
 
 No database, Node build system or Composer installation is required for the first alpha.
 
-## Quick start: view the demo (no password hashing required)
+## Sample login for an unconfigured test installation
 
 If **none** of `FFM_USERNAME`, `FFM_PASSWORD_HASH` or `FFM_STORAGE_ROOT` is set,
-Forge File Manager automatically starts a **virtual, read-only demo**:
+Forge File Manager permits a restricted sample login backed by a **virtual, read-only filesystem** (no live hosting access):
 
 - **Username:** `demo`
 - **Password:** `demo123`
@@ -75,10 +77,10 @@ Forge File Manager automatically starts a **virtual, read-only demo**:
 - Forcing the demo with `FFM_DEMO_MODE=1` ignores real hosting credentials. Set `FFM_DEMO_MODE=0` to disable the automatic demo in production.
 - Partially configured production credentials **fail closed** instead of falling back to demo.
 
-The demo is **not** an administrative account and does not grant hosting filesystem access.
+The user interface has no demonstration-mode banner; the account name is shown normally. This **public test identity** is not an administrative account and does not grant hosting filesystem access.
 **Never configure a real account as `demo / demo123`.** That combination is rejected in live mode.
 
-The standalone demo can be tested locally with:
+This sample login can be tested locally with:
 
 ```bash
 php -S 127.0.0.1:8080 -t public public/router.php
@@ -171,10 +173,11 @@ bash tests/http-smoke.sh
 bash tests/demo-i18n-smoke.sh
 php tests/deployment-mode.php
 node --check public/assets/app.js
+node tests/ui-structure.test.js
 find src public bin tests -name '*.php' -print0 | xargs -0 -n1 php -l
 ```
 
-The optional `tests/browser-i18n.py` runs an **offline** Chromium UI exercise with mocked API responses (no network or live server). It verified the demo sign-in screen, account header, read-only toolbar and English/French switching locally. Live-site browser E2E and accessibility review are still outstanding.
+Optional offline Chromium tests `tests/browser-i18n.py` and `tests/browser-layout.py` verify locale switching, footer disk usage, no sidebar, a centered toolbar, 25-per-page pagination, search/sort behavior and restricted public sample credentials using mocked HTTP responses. Live-site browser E2E and accessibility review are still outstanding.
 
 ## Project layout
 
@@ -198,6 +201,8 @@ The optional `tests/browser-i18n.py` runs an **offline** Chromium UI exercise wi
 ├── tests/
 │   ├── filesystem.php
 │   ├── http-smoke.sh
+│   ├── browser-layout.py  # Offline Chrome pagination verification
+│   ├── ui-structure.test.js  # Dependency-free CI checks
 │   └── browser-smoke.py      # Optional; not passed in this environment
 ├── DOCUMENTATION/
 │   ├── ARCHITECTURE.md

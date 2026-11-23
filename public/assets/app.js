@@ -17,13 +17,14 @@
     get(name, fallback) { try { return JSON.parse(localStorage.getItem(name)) ?? fallback; } catch { return fallback; } },
     set(name, val) { try { localStorage.setItem(name, JSON.stringify(val)); } catch {} }
   };
+  const PAGE_SIZE = 25;
   const saved = storage.get('ffm_preferences', {});
   const state = {
     username: '', csrf: '', path: '', items: [], selected: new Set(), capabilities: {},
     view: saved.view === 'grid' ? 'grid' : 'list',
     showHidden: !!saved.showHidden, theme: saved.theme === 'dark' ? 'dark' : 'light',
     dense: !!saved.dense, language: ['fr','en'].includes(saved.language) ? saved.language : 'en', search: '', sort: saved.sort || 'name',
-    rootFolders: [], notices: [], modalCloser: null, busy: false
+    page: 1, disk: null, notices: [], modalCloser: null, busy: false
   };
   // Centralized, versioned English/French catalogs under public/languages/.
   // Source strings are French until the selected catalog is loaded.
@@ -80,7 +81,7 @@
     state.language = lang;
     preferences();
     applyTranslations();
-    if (!$('#app').classList.contains('hidden')) render();
+    if (!$('#app').classList.contains('hidden')) { render(); updateDisk(state.disk); }
     applyTranslations();
   }
 
@@ -147,8 +148,7 @@
     state.username = payload.username;
     state.csrf = payload.csrf;
     state.capabilities = payload.capabilities ?? {};
-    const demo = !!state.capabilities.demo;
-    $('#demo-mode-flag').classList.toggle('hidden',!demo);
+    const demo = !!state.capabilities.readOnly;
     for (const button of $$('button[data-action]')) {
       if (['new-folder','new-file','upload'].includes(button.dataset.action)) button.disabled = demo;
     }
@@ -167,7 +167,7 @@
       const me = await get('me');
       showApp(me);
       await navigate('');
-      await loadRootFolders();
+
     } catch (error) {
       showLogin();
       if (!/Authentication required|Session expired/.test(error.message)) $('#login-error').textContent = error.message;
@@ -219,37 +219,19 @@
       state.path = data.path;
       state.items = data.items || [];
       state.selected.clear();
+      state.page = 1;
       $('#file-search').value = '';
       state.search = '';
       renderBreadcrumbs();
       render();
-      updateDisk(data.disk);
+      state.disk = data.disk;
+      updateDisk(state.disk);
       $('#status-path').textContent = '/' + state.path;
       if (data.truncated) toast(t('Affichage limité aux {count} premières entrées.',{count:data.maxEntries}), true);
-      $('#sidebar').classList.remove('open');
       return data;
     } catch (error) { toast(error.message, true); throw error; }
   }
-  async function refresh() { await navigate(state.path); await loadRootFolders(); }
-  async function loadRootFolders() {
-    try {
-      const data = state.path === '' ? {items: state.items} : await get('list', {path:''});
-      state.rootFolders = data.items.filter(f=>f.type==='directory').sort((a,b)=>a.name.localeCompare(b.name,state.language));
-      renderTree();
-    } catch { /* Account may have no permission to list its root. */ }
-  }
-  function renderTree() {
-    const root = $('#folder-tree');
-    root.replaceChildren();
-    for (const file of state.rootFolders) {
-      const btn = document.createElement('button');
-      btn.className = `side-link level-1 ${state.path === file.path ? 'active' : ''}`;
-      btn.dataset.nav = file.path;
-      btn.innerHTML = `${icon('folder')}<span>${escapeHtml(file.name)}</span>`;
-      root.appendChild(btn);
-    }
-    $$('[data-nav=""]').forEach(btn=>btn.classList.toggle('active',state.path===''));
-  }
+  async function refresh() { await navigate(state.path); }
   function renderBreadcrumbs() {
     const nav = $('#breadcrumbs'); nav.replaceChildren();
     const parts = state.path ? state.path.split('/') : [];
@@ -264,6 +246,7 @@
   }
   function updateDisk(disk) {
     if (!disk || disk.total === null || disk.free === null || disk.total <= 0) {
+      $('#disk-progress').style.width = '0%';
       $('#disk-numbers').textContent = t('Indisponible');
       return;
     }
@@ -272,7 +255,11 @@
     $('#disk-numbers').textContent = `${prettySize(used)} / ${prettySize(disk.total)}`;
   }
   function render() {
-    const files = currentRows();
+    const all = currentRows();
+    const pages = Math.max(1, Math.ceil(all.length / PAGE_SIZE));
+    state.page = Math.max(1, Math.min(state.page, pages));
+    const first = (state.page - 1) * PAGE_SIZE;
+    const files = all.slice(first, first + PAGE_SIZE);
     const rows = $('#file-rows');
     rows.innerHTML = files.map(file => {
       const [symbol,type] = typeIcon(file);
@@ -299,16 +286,62 @@
     $('#file-grid').classList.toggle('hidden', state.view !== 'grid');
     $('#empty-state').classList.toggle('hidden', files.length > 0);
     $('#empty-state strong').textContent = state.search ? t('none') : t('Dossier vide');
-    $('#status-count').textContent = t('{count} élément(s) · {selected} sélectionné(s)',{count:state.items.length,selected:state.selected.size});
+    $('#status-count').textContent = t('{count} élément(s) · {selected} sélectionné(s)',{count:all.length,selected:state.selected.size});
     $('#select-all').checked = files.length > 0 && files.every(f => state.selected.has(f.path));
     $('#select-all').indeterminate = files.some(f=>state.selected.has(f.path)) && !$('#select-all').checked;
     $('#selection-info').classList.toggle('hidden',state.selected.size === 0);
     $('#selected-count').textContent = `${state.selected.size} ${t('selected')}`;
     syncActionButtons();
-    renderTree();
+    renderPagination(all.length, pages);
     applyTranslations();
   }
 
+
+  function renderPagination(total, pages) {
+    const first = total ? (state.page - 1) * PAGE_SIZE + 1 : 0;
+    const last = Math.min(total, state.page * PAGE_SIZE);
+    $('#pagination-summary').textContent = t('Éléments {first}–{last} sur {total}', {first,last,total});
+    const target = $('#pagination-buttons');
+    target.replaceChildren();
+    const button = (label, page, disabled = false, current = false) => {
+      const element = document.createElement('button');
+      element.className = 'page-button' + (current ? ' active' : '');
+      element.type = 'button';
+      element.textContent = label;
+      element.disabled = disabled;
+      element.dataset.page = String(page);
+      element.setAttribute('aria-label', label === '‹' ? t('Page précédente') : label === '›' ? t('Page suivante') : current ? t('Page {page} active', {page}) : t('Page {page}', {page}));
+      if (current) element.setAttribute('aria-current', 'page');
+      target.appendChild(element);
+    };
+    button('‹', state.page - 1, state.page <= 1);
+    const shown = new Set([1, pages, ...Array.from({length: 5}, (_, i) => state.page + i - 2).filter(p => p > 0 && p <= pages)]);
+    let previous = 0;
+    for (const page of [...shown].sort((a,b) => a-b)) {
+      if (page > previous + 1) {
+        const gap = document.createElement('span');
+        gap.className = 'page-gap'; gap.textContent = '…';
+        gap.setAttribute('aria-hidden', 'true');
+        target.appendChild(gap);
+      }
+      button(String(page), page, false, page === state.page);
+      previous = page;
+    }
+    button('›', state.page + 1, state.page >= pages);
+  }
+  function switchPage(page) {
+    const totalPages = Math.max(1, Math.ceil(currentRows().length / PAGE_SIZE));
+    if (!Number.isInteger(page) || page < 1 || page > totalPages || page === state.page) return;
+    state.page = page;
+    state.selected.clear();
+    render();
+    $('#files-container').scrollTop = 0;
+  }
+  function resetPage() {
+    state.page = 1;
+    state.selected.clear();
+    $('#files-container').scrollTop = 0;
+  }
   function oneSelected() {
     if (state.selected.size !== 1) return null;
     return state.items.find(f => f.path === [...state.selected][0]) || null;
@@ -520,12 +553,12 @@
     $('#setting-hidden').checked=state.showHidden;
     $('#setting-theme').addEventListener('change',e=>{state.theme=e.target.value;preferences();});
     $('#setting-dense').addEventListener('change',e=>{state.dense=e.target.checked;preferences();});
-    $('#setting-hidden').addEventListener('change',e=>{state.showHidden=e.target.checked;preferences();render();});
+    $('#setting-hidden').addEventListener('change',e=>{state.showHidden=e.target.checked;resetPage();preferences();render();});
   }
   function profileDialog() {
     const content = `<p><strong>Compte connecté :</strong> ${escapeHtml(state.username)}</p>
       <p><strong>Racine autorisée :</strong> / (racine du compte, non racine Linux)</p>
-      <p><strong>Version :</strong> 0.2.2-alpha</p>
+      <p><strong>Version :</strong> 0.2.3-alpha</p>
       <p>Cette version utilise une authentification autonome. Les profils revendeurs, le SSO et les quotas par compte sont prévus pour une version ultérieure.</p>`;
     openModal('Mon compte',content,[{text:'Fermer',run:closeModal}],{kicker:'COMPTE HÉBERGEMENT'});
   }
@@ -539,7 +572,7 @@
     const file = path ? state.items.find(f=>f.path===path) : oneSelected();
     try {
       if (state.capabilities.readOnly && !['open','edit','properties','settings','profile','logout','refresh'].includes(action)) {
-        throw Error(t('Cette démonstration est en lecture seule.'));
+        throw Error(t('Cet accès aux fichiers d’exemple est en lecture seule.'));
       }
       if (['new-file','new-folder'].includes(action)) {
         const kind = action==='new-file' ? 'file' : 'directory';
@@ -598,7 +631,7 @@
     $('#login-error').textContent='';
     const username=$('#login-username').value;
     const password=$('#login-password').value;
-    try { await api('login',{username,password}); const me = await get('me');showApp(me);$('#login-password').value='';await navigate('');await loadRootFolders(); }
+    try { await api('login',{username,password}); const me = await get('me');showApp(me);$('#login-password').value='';await navigate(''); }
     catch(error){$('#login-error').textContent=error.message;}
   });
   document.addEventListener('click',e=>{
@@ -648,15 +681,19 @@
     if(e.target.id==='files-container') {state.selected.clear();render();}
   });
   $('#select-all').addEventListener('change',e=>{
-    if(e.target.checked) currentRows().forEach(f=>state.selected.add(f.path));
+    if(e.target.checked) currentRows().slice((state.page-1)*PAGE_SIZE,state.page*PAGE_SIZE).forEach(f=>state.selected.add(f.path));
     else state.selected.clear();
     render();
   });
   $('#clear-selection').addEventListener('click',()=>{state.selected.clear();render();});
-  $('#file-search').addEventListener('input',e=>{state.search=e.target.value;render();});
-  $('#sort-by').addEventListener('change',e=>{state.sort=e.target.value;preferences();render();});
-  $('#show-hidden').addEventListener('change',e=>{state.showHidden=e.target.checked;preferences();render();});
+  $('#file-search').addEventListener('input',e=>{state.search=e.target.value;resetPage();render();});
+  $('#sort-by').addEventListener('change',e=>{state.sort=e.target.value;resetPage();preferences();render();});
+  $('#show-hidden').addEventListener('change',e=>{state.showHidden=e.target.checked;resetPage();preferences();render();});
   $('#list-view').addEventListener('click',()=>{state.view='list';preferences();render();});
+  $('#pagination-buttons').addEventListener('click',e=>{
+    const btn=e.target.closest('button[data-page]');
+    if (btn && !btn.disabled) switchPage(Number(btn.dataset.page));
+  });
   $('#grid-view').addEventListener('click',()=>{state.view='grid';preferences();render();});
   $('#profile-btn').addEventListener('click',()=>{
     const dropdown=$('#profile-dropdown');const willOpen=dropdown.classList.contains('hidden');
@@ -665,8 +702,6 @@
   });
   $('#settings-btn').addEventListener('click',settingsDialog);
   $('#notifications-btn').addEventListener('click',notifyDialog);
-  $('#sidebar-refresh').addEventListener('click',()=>void loadRootFolders());
-  $('#mobile-sidebar').addEventListener('click',()=>$('#sidebar').classList.toggle('open'));
   $('#modal-close').addEventListener('click',requestCloseModal);
   $('#modal-backdrop').addEventListener('click',e=>{if(e.target.id==='modal-backdrop') requestCloseModal();});
   $('#upload-picker').addEventListener('change',async e=>{
@@ -714,13 +749,13 @@
       }
       return;
     }
-    if(e.key==='Escape'){closeMenu();requestCloseModal();$('#sidebar').classList.remove('open');return;}
+    if(e.key==='Escape'){closeMenu();requestCloseModal();return;}
     if($('#app').classList.contains('hidden'))return;
     const editing=e.target.matches('input,textarea,select,[contenteditable]');
     if(editing)return;
     if(e.key==='F2'&&oneSelected()){e.preventDefault();void executeAction('rename');}
     if(e.key==='Delete'&&oneSelected()){e.preventDefault();void executeAction('delete');}
-    if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='a'){e.preventDefault();currentRows().forEach(f=>state.selected.add(f.path));render();}
+    if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='a'){e.preventDefault();currentRows().slice((state.page-1)*PAGE_SIZE,state.page*PAGE_SIZE).forEach(f=>state.selected.add(f.path));render();}
     if((e.shiftKey&&e.key==='F10')||e.key==='ContextMenu'){
       e.preventDefault();openContext(oneSelected(),Math.round(window.innerWidth/2),Math.round(window.innerHeight/2));
     }

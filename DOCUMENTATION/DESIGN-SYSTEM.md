@@ -7,10 +7,10 @@ Clean, professional, flat surfaces. No gradients or decorative color strips at t
 ## Core layout
 
 1. **Global header:** Brand, contextual description, notifications, settings, authenticated username with avatar and dropdown.
-2. **Action sub-header:** New folder, new file, upload, download, copy, move, rename, CHMOD, ZIP, delete, refresh. Disabled when operation cannot apply. Compact on smaller screens.
-3. **Sidebar:** Home and root directory navigation plus clearly labelled host-volume disk usage (not account quota).
-4. **Main panel:** Title, breadcrumb path, current-folder search, hidden-file toggle, sorting, list/grid, selectable rows, per-item menu.
-5. **Status bar:** Current path, number of files/selection, status.
+2. **Centered action sub-header:** New folder, new file, upload, download, copy, move, rename, CHMOD, ZIP, delete, refresh. Disabled when operation cannot apply. Compact on smaller screens.
+3. **Navigation:** Full-width breadcrumb navigation without a sidebar or redundant explorer title.
+4. **Main panel:** Breadcrumbs, current-folder search, hidden-file toggle, sorting, list/grid, selectable rows, per-item menu, constrained scroll area and 25-item pages.
+5. **Status bar:** Current path, file/selection count, server disk usage (unavailable fallback and a visible disclaimer that it is not an account quota), connection status.
 
 ## Context menus
 
@@ -31,8 +31,18 @@ Modals use an accessible dialog role and Escape-to-close. New folder/new file/re
 
 ## Responsive
 
-On narrow screens the toolbar prioritizes icons, the sidebar becomes a drawer, and less important file columns disappear. Keyboard access and accessible focus states are included; formal mobile/touch and screen-reader tests remain required.
+On narrow screens the toolbar prioritizes icons and stays horizontally scrollable; no sidebar/drawer exists. Less important file columns disappear. Keyboard access and accessible focus states are included; formal mobile/touch and screen-reader tests remain required.
 
 ## v0.2 contextual UX
 
 The Copy action supports files and folders when `me.capabilities.copyDirectories` is true. The action prompts for a destination relative to the hosting home and communicates naming conflicts through automatic ` (copy)` suffixes. Properties for regular files include an opt-in SHA-256 action; hashing is not automatic. Upload drag/drop and picker display a local size warning, but server policy is authoritative. Context menus expose `menuitem` semantics with Arrow Up/Down/Home/End keyboard traversal. Focus trapping and a full WCAG screen-reader audit are still outstanding.
+
+## v0.2.3 — full-width explorer and pagination
+
+- Removed the sidebar, the "FILE EXPLORER" eyebrow, and the "My files" heading. Breadcrumbs remain the authoritative navigation.
+- Centered the action toolbar; on mobile it becomes a horizontally scrollable strip.
+- Added client-side pagination: 25 visible files/folders per page after search/hidden filters/sort, numbered pages, previous/next, range indicator, reset on navigation/filter/sort, selection scoped to the current page.
+- Vertical scroll bar stays inside the file listing rather than scrolling the whole page. Table headers are sticky.
+- Relocated the server-volume disk meter to the footer. If the server cannot provide usage, show "Unavailable" instead of inventing quota metrics.
+- Removed the visual read-only demo banner while retaining `demo / demo123` on an unconfigured login screen. Backend read-only virtual isolation is not weakened.
+- The current PHP API returns at most `FFM_MAX_ENTRIES` (default 2,000) per directory. The UI paginates those returned items; server-side cursor/offset pagination for bigger directories remains a separate backlog task.

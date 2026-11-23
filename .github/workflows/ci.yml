@@ -31,3 +31,5 @@ jobs:
         run: php tests/deployment-mode.php
       - name: JavaScript syntax validation
         run: node --check public/assets/app.js
+      - name: User interface structure validation
+        run: node tests/ui-structure.test.js

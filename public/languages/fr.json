@@ -167,5 +167,16 @@
   "Supprimer définitivement « {file} » ? Les dossiers non vides ne peuvent pas être supprimés. Cette version ne possède pas encore de corbeille.": "Supprimer définitivement « {file} » ? Les dossiers non vides ne peuvent pas être supprimés. Cette version ne possède pas encore de corbeille.",
   "{name} : fichier supérieur à la limite de {max}": "{name} : fichier supérieur à la limite de {max}",
   "Fichier importé": "Fichier importé",
-  "Fichier supérieur à la limite": "Fichier supérieur à la limite"
+  "Fichier supérieur à la limite": "Fichier supérieur à la limite",
+  "Éléments {first}–{last} sur {total}": "Éléments {first}–{last} sur {total}",
+  "Page {page} active": "Page {page} active",
+  "Page {page}": "Page {page}",
+  "Identifiants de connexion": "Identifiants de connexion",
+  "Utilisateur :": "Utilisateur :",
+  "Mot de passe :": "Mot de passe :",
+  "Accès aux fichiers d’exemple uniquement ; aucune modification des fichiers réels.": "Accès aux fichiers d’exemple uniquement ; aucune modification des fichiers réels.",
+  "Cet accès aux fichiers d’exemple est en lecture seule.": "Cet accès aux fichiers d’exemple est en lecture seule.",
+  "Pagination des fichiers": "Pagination des fichiers",
+  "Page précédente": "Page précédente",
+  "Page suivante": "Page suivante"
 }
