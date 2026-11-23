@@ -91,6 +91,12 @@ final class Filesystem
                 }
                 throw new FileError('Path does not exist.', 404);
             }
+            $stat = @lstat($candidate);
+            // A hard link cannot reveal whether its other name is outside the
+            // authorized root. Refuse linked regular files rather than guess.
+            if ($stat !== false && (($stat['mode'] & 0170000) === 0100000) && ($stat['nlink'] ?? 1) > 1) {
+                throw new FileError('Hard-linked files are not supported within a managed account.', 403);
+            }
             $real = realpath($candidate);
             if ($real === false || ($real !== $this->root && !str_starts_with($real, $this->root . DIRECTORY_SEPARATOR))) {
                 throw new FileError('Access outside the storage root is forbidden.', 403);
@@ -127,6 +133,7 @@ final class Filesystem
             'type' => $link ? 'symlink' : ($dir ? 'directory' : 'file'),
             'size' => $dir || $link ? null : (($stat['size'] ?? null) ?: 0),
             'modified' => $stat['mtime'] ?? null,
+            'modifiedIso' => isset($stat['mtime']) ? gmdate('Y-m-d\TH:i:s\Z', (int) $stat['mtime']) : null,
             'mode' => sprintf('%03o', ($stat['mode'] ?? 0) & 0777),
             'readable' => !$link && is_readable($absolute),
             'writable' => !$link && is_writable($absolute),
@@ -248,12 +255,26 @@ final class Filesystem
         if ($target === $this->root) {
             throw new FileError('Changing root permissions is blocked.', 403);
         }
+        $prior = @lstat($target);
+        if (!is_array($prior) || (!is_file($target) && !is_dir($target))) {
+            throw new FileError('CHMOD only supports regular files and directories.', 403);
+        }
         if (!@chmod($target, $numeric)) {
             throw new FileError('Permission change failed (check hosting user ownership).', 403);
         }
-        // PHP versions differ in how quickly cached stat data is invalidated.
         clearstatcache(true, $target);
-        return ['path' => $this->relative($relative), 'mode' => sprintf('%03o', fileperms($target) & 0777)];
+        $after = @lstat($target);
+        if (!is_array($after) || $prior['dev'] !== $after['dev'] || $prior['ino'] !== $after['ino']) {
+            throw new FileError('Target changed during CHMOD; verify its permissions.', 409);
+        }
+        if (($after['mode'] & 0777) !== $numeric) {
+            throw new FileError('Requested permissions were not applied.', 409);
+        }
+        return [
+            'path' => $this->relative($relative),
+            'mode' => sprintf('%03o', $after['mode'] & 0777),
+            'modified' => $after['mtime'], // CHMOD changes ctime, not mtime.
+        ];
     }
 
     public function readText(string $relative): array
@@ -262,61 +283,100 @@ final class Filesystem
         if (!is_file($source) || !is_readable($source)) {
             throw new FileError('File cannot be read.', 403);
         }
-        $size = filesize($source);
+        $size = @filesize($source);
         if ($size === false || $size > $this->maxEditBytes) {
             throw new FileError('File exceeds the editor size limit.', 413);
         }
         $content = @file_get_contents($source);
-        if ($content === false || str_contains($content, "\0") || !preg_match('//u', $content)) {
-            throw new FileError('Editor supports UTF-8 text files only.', 415);
+        if ($content === false || strlen($content) > $this->maxEditBytes ||
+            str_contains($content, "\0") || !preg_match('//u', $content)) {
+            throw new FileError('Editor supports bounded UTF-8 text files only.', 415);
         }
-        return ['path' => $this->relative($relative), 'content' => $content, 'hash' => hash('sha256', $content), 'maxBytes' => $this->maxEditBytes];
+        clearstatcache(true, $source);
+        return [
+            'path' => $this->relative($relative), 'content' => $content,
+            'hash' => hash('sha256', $content), 'maxBytes' => $this->maxEditBytes,
+            'modified' => @filemtime($source) ?: null,
+        ];
     }
 
+    /** Optimistic concurrency + advisory lock; does not replace OS isolation. */
     public function saveText(string $relative, string $content, string $expectedHash): array
     {
         if (strlen($content) > $this->maxEditBytes || str_contains($content, "\0") || !preg_match('//u', $content)) {
             throw new FileError('Invalid UTF-8 text or editor size limit exceeded.', 413);
         }
+        if (!preg_match('/^[0-9a-f]{64}$/D', $expectedHash)) {
+            throw new FileError('A valid file revision hash is required.', 400);
+        }
         $source = $this->resolve($relative);
-        if (!is_file($source) || !is_writable($source)) {
-            throw new FileError('File is not writable.', 403);
+        $parent = dirname($source);
+        if (!is_file($source) || !is_writable($source) || !is_writable($parent)) {
+            throw new FileError('File and its directory must be writable.', 403);
         }
-        $before = @file_get_contents($source);
-        if ($before === false || !hash_equals(hash('sha256', $before), $expectedHash)) {
-            throw new FileError('File changed since it was opened. Reload before saving.', 409);
-        }
-        $dir = dirname($source);
-        $temp = $dir . '/.ffm-tmp-' . bin2hex(random_bytes(12));
-        $handle = @fopen($temp, 'x+b');
-        if ($handle === false) {
-            throw new FileError('Could not allocate a temporary file.', 500);
-        }
+        $in = @fopen($source, 'rb');
+        if (!is_resource($in)) throw new FileError('Could not open file for editing.', 403);
+        $locked = false;
+        $temp = null;
         try {
-            $written = fwrite($handle, $content);
-            if ($written !== strlen($content)) {
-                throw new FileError('Incomplete write.', 500);
+            if (!flock($in, LOCK_EX)) throw new FileError('Could not lock file for editing.', 409);
+            $locked = true;
+            $beforeStat = fstat($in);
+            if (!is_array($beforeStat) || ($beforeStat['mode'] & 0170000) !== 0100000 || ($beforeStat['nlink'] ?? 1) !== 1 ||
+                $beforeStat['size'] > $this->maxEditBytes) {
+                throw new FileError('File is not a safe, bounded regular file.', 403);
             }
-            fflush($handle);
-            fclose($handle);
-            $handle = null;
-            @chmod($temp, fileperms($source) & 0777);
-            // Recheck, but concurrent external filesystem writers remain a race.
-            if (!hash_equals(hash('sha256', (string) @file_get_contents($source)), $expectedHash)) {
+            $before = stream_get_contents($in, $this->maxEditBytes + 1);
+            if ($before === false || strlen($before) > $this->maxEditBytes ||
+                !hash_equals(hash('sha256', $before), $expectedHash)) {
+                throw new FileError('File changed since it was opened. Reload before saving.', 409);
+            }
+            $temp = $parent . '/.ffm-tmp-' . bin2hex(random_bytes(16));
+            // Restrict new temporary files from creation, including under a
+            // directory whose static files may be served over HTTP.
+            $priorUmask = umask(0077);
+            try { $out = @fopen($temp, 'xb'); }
+            finally { umask($priorUmask); }
+            if (!is_resource($out)) throw new FileError('Could not allocate a temporary file.', 500);
+            try {
+                $length = strlen($content);
+                for ($offset = 0; $offset < $length;) {
+                    $n = fwrite($out, substr($content, $offset));
+                    if ($n === false || $n === 0) throw new FileError('Incomplete write.', 500);
+                    $offset += $n;
+                }
+                if (!fflush($out)) throw new FileError('Could not flush edited file.', 500);
+                if (function_exists('fsync') && !fsync($out)) {
+                    throw new FileError('Could not synchronize edited file.', 500);
+                }
+            } finally {
+                fclose($out);
+            }
+            if (!@chmod($temp, $beforeStat['mode'] & 0777)) {
+                throw new FileError('Could not preserve original file permissions.', 500);
+            }
+            // Check the current pathname and inode before atomic publication.
+            clearstatcache(true, $source);
+            $this->resolve($relative);
+            $now = @lstat($source);
+            if (!is_array($now) || $now['dev'] !== $beforeStat['dev'] || $now['ino'] !== $beforeStat['ino'] ||
+                !hash_equals($expectedHash, (string) @hash_file('sha256', $source))) {
                 throw new FileError('File changed during save.', 409);
             }
-            if (!@rename($temp, $source)) {
-                throw new FileError('Could not replace the file.', 500);
-            }
+            if (!@rename($temp, $source)) throw new FileError('Could not replace the file.', 500);
+            $temp = null;
         } finally {
-            if (is_resource($handle)) {
-                fclose($handle);
-            }
-            if (file_exists($temp)) {
-                @unlink($temp);
-            }
+            if ($temp !== null) @unlink($temp);
+            if ($locked) flock($in, LOCK_UN);
+            fclose($in);
         }
-        return ['path' => $this->relative($relative), 'hash' => hash('sha256', $content)];
+        clearstatcache(true, $source);
+        return [
+            'path' => $this->relative($relative),
+            'hash' => hash('sha256', $content),
+            'modified' => @filemtime($source) ?: null,
+            'mode' => sprintf('%03o', (int) (@fileperms($source) ?: 0) & 0777),
+        ];
     }
 
     public function remove(string $relative): array
@@ -536,62 +596,89 @@ final class Filesystem
         return ['path' => $relativeTarget, 'size' => filesize($target)];
     }
 
+    /** Create a ZIP in a temporary sibling, then publish only if free. */
     public function zip(string $relative): array
     {
         if (!class_exists(\ZipArchive::class)) {
             throw new FileError('PHP ZIP extension is not installed.', 501);
         }
         [$parent, $parentRel, $name] = $this->parentOf($relative);
-        $source = $this->resolve($relative);
-        $archiveName = $name . '.zip';
-        $relativeTarget = ($parentRel ? $parentRel . '/' : '') . $archiveName;
-        $target = $this->resolve($relativeTarget, false);
-        if (file_exists($target) || is_link($target) || !is_writable($parent)) {
-            throw new FileError('Archive destination already exists or is not writable.', 409);
+        $sourceRel = $this->relative($relative);
+        $source = $this->resolve($sourceRel);
+        if (!is_file($source) && !is_dir($source)) {
+            throw new FileError('ZIP supports only regular files and directories.', 403);
         }
-        $zip = new \ZipArchive();
-        if ($zip->open($target, \ZipArchive::CREATE | \ZipArchive::EXCL) !== true) {
-            throw new FileError('Could not initialize archive.', 500);
+        if (!is_readable($source) || !is_writable($parent)) {
+            throw new FileError('ZIP source must be readable and target directory writable.', 403);
         }
-        $total = 0;
-        $count = 0;
+        $targetRel = ($parentRel ? $parentRel . '/' : '') . $name . '.zip';
+        $target = $this->resolve($targetRel, false);
+        if (file_exists($target) || is_link($target)) throw new FileError('Archive already exists.', 409);
+        $budget = ['entries' => 0, 'bytes' => 0];
+        $this->preflightCopy($source, $sourceRel, $budget);
+        $stage = $parent . '/.ffm-zip-' . bin2hex(random_bytes(16)) . '.zip';
+        $archive = new \ZipArchive();
+        $priorUmask = umask(0077);
+        try { $openedOk = $archive->open($stage, \ZipArchive::CREATE | \ZipArchive::EXCL); }
+        finally { umask($priorUmask); }
+        if ($openedOk !== true) {
+            @unlink($stage);
+            throw new FileError('Could not initialize private ZIP archive.', 500);
+        }
+        $opened = true;
         try {
             if (is_file($source)) {
-                $bytes = filesize($source);
-                if ($bytes === false || $bytes > 100 * 1024 * 1024) {
-                    throw new FileError('Archive size limit exceeded (100 MB).', 413);
-                }
-                $zip->addFile($source, $name);
+                if (!$archive->addFile($source, $name)) throw new FileError('Could not add file to ZIP.', 500);
             } else {
-                $zip->addEmptyDir($name);
-                $iter = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($source, \FilesystemIterator::SKIP_DOTS), \RecursiveIteratorIterator::SELF_FIRST);
+                if (!$archive->addEmptyDir($name)) throw new FileError('Could not add directory to ZIP.', 500);
+                $iter = new \RecursiveIteratorIterator(
+                    new \RecursiveDirectoryIterator($source, \FilesystemIterator::SKIP_DOTS),
+                    \RecursiveIteratorIterator::SELF_FIRST
+                );
+                $entries = 0;
+                $bytes = 0;
                 foreach ($iter as $entry) {
-                    if (++$count > $this->maxEntries || $iter->getDepth() > 20 || $entry->isLink()) {
-                        throw new FileError('Archive entry, nesting, or symlink limit exceeded.', 413);
+                    if (++$entries > min($this->maxEntries, 2000) || $iter->getDepth() > 20 || $entry->isLink()) {
+                        throw new FileError('Archive entry count, depth or link limit exceeded.', 413);
                     }
-                    $pathname = $entry->getPathname();
-                    $this->resolve($this->relative($relative) . substr($pathname, strlen($source)));
-                    $localName = $name . substr($pathname, strlen($source));
-                    $localName = str_replace(DIRECTORY_SEPARATOR, '/', $localName);
+                    $path = $entry->getPathname();
+                    $this->resolve($sourceRel . substr($path, strlen($source)));
+                    $local = str_replace(DIRECTORY_SEPARATOR, '/', $name . substr($path, strlen($source)));
                     if ($entry->isDir()) {
-                        $zip->addEmptyDir($localName);
+                        if (!$archive->addEmptyDir($local)) throw new FileError('Could not add ZIP directory.', 500);
                     } elseif ($entry->isFile()) {
-                        $total += $entry->getSize();
-                        if ($total > 100 * 1024 * 1024) {
-                            throw new FileError('Archive size limit exceeded (100 MB).', 413);
+                        $size = @filesize($path);
+                        if ($size === false || ($bytes += $size) > 100 * 1024 * 1024) {
+                            throw new FileError('Archive content exceeds 100 MiB.', 413);
                         }
-                        $zip->addFile($pathname, $localName);
+                        if (!$archive->addFile($path, $local)) throw new FileError('Could not add ZIP file.', 500);
+                    } else {
+                        throw new FileError('Archive contains an unsupported file type.', 403);
                     }
                 }
             }
-            if (!$zip->close()) {
-                throw new FileError('Could not finalize archive.', 500);
+            if (!$archive->close()) {
+                $opened = false;
+                throw new FileError('Could not finalize ZIP archive.', 500);
             }
-            return ['path' => $relativeTarget];
-        } catch (\Throwable $e) {
-            $zip->close();
-            @unlink($target);
-            throw $e;
+            $opened = false;
+            clearstatcache(true, $stage);
+            if (!is_file($stage) || @filesize($stage) > 110 * 1024 * 1024 || !@chmod($stage, 0600)) {
+                throw new FileError('ZIP archive is invalid or exceeds storage limits.', 413);
+            }
+            // This check is not a substitute for account-level OS isolation.
+            if (file_exists($target) || is_link($target) || !@rename($stage, $target)) {
+                throw new FileError('ZIP destination was occupied during publication.', 409);
+            }
+            $stage = '';
+            clearstatcache(true, $target);
+            return [
+                'path' => $targetRel, 'entries' => $budget['entries'],
+                'bytes' => $budget['bytes'], 'modified' => @filemtime($target) ?: null,
+            ];
+        } finally {
+            if ($opened) @$archive->close();
+            if ($stage !== '') @unlink($stage);
         }
     }
 

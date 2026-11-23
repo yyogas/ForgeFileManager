@@ -51,10 +51,12 @@ final class ArchiveExtractor
                 throw new FileError('Unable to create a private extraction staging directory.', 500);
             }
             $total = 0;
+            $directoryTimes = [];
             foreach ($entries as $entry) {
                 $absolute = $stage . '/' . $entry['name'];
                 if ($entry['directory']) {
                     self::mkdirs($stage, $entry['name']);
+                    if ($entry['mtime'] !== null) $directoryTimes[$entry['name']] = $entry['mtime'];
                     continue;
                 }
                 self::mkdirs($stage, dirname($entry['name']));
@@ -90,6 +92,17 @@ final class ArchiveExtractor
                     fclose($from);
                     fclose($to);
                 }
+                if ($entry['mtime'] !== null && !@touch($absolute, $entry['mtime'])) {
+                    throw new FileError('Could not restore ZIP file modification date.', 500);
+                }
+            }
+            // Touch directories only after all descendant entries are written;
+            // creating children changes parent directory mtime.
+            uksort($directoryTimes, static fn(string $a, string $b): int => strlen($b) <=> strlen($a));
+            foreach ($directoryTimes as $directory => $mtime) {
+                if (!@touch($stage . '/' . $directory, $mtime)) {
+                    throw new FileError('Could not restore ZIP directory modification date.', 500);
+                }
             }
             $destination = $fs->resolve($destinationRel, false);
             // Recheck immediately before final publication. As with other PHP
@@ -105,7 +118,7 @@ final class ArchiveExtractor
         }
     }
 
-    /** @return list<array{index:int,name:string,directory:bool,size:int,crc:string}> */
+    /** @return list<array{index:int,name:string,directory:bool,size:int,crc:string,mtime:?int}> */
     private static function inspect(ZipArchive $zip): array
     {
         if ($zip->numFiles > self::MAX_ENTRIES) {
@@ -153,9 +166,13 @@ final class ArchiveExtractor
                 $bytes += $size;
                 if ($bytes > self::MAX_BYTES) throw new FileError('ZIP extraction exceeds the 100 MiB limit.', 413);
             }
+            $mtime = $stat['mtime'] ?? null;
+            // Do not import future timestamps or malformed dates from untrusted archives.
+            if (!is_int($mtime) || $mtime < 315532800 || $mtime > time() + 86400) $mtime = null;
             $files[] = [
                 'index' => $i, 'name' => $clean, 'directory' => $directory,
                 'size' => $size, 'crc' => sprintf('%08x', (int) ($stat['crc'] ?? 0)),
+                'mtime' => $mtime,
             ];
         }
         foreach ($paths as $name => $type) {
